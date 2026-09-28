@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-emdash.emdashTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/emdash-cms/emdash#readme"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://blackswampai.com/n8n-nodes/emdash/"
+			}
+		]
+	}
+}
