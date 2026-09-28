@@ -1,7 +1,7 @@
 /* eslint-disable @n8n/community-nodes/no-restricted-imports -- package-boundary fixture */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { assertRegistrationIcons } from '../scripts/node-load-smoke.mjs';
 
@@ -37,6 +37,7 @@ describe('packed icon validation', () => {
 			),
 		).toThrow('missing or empty');
 	});
+
 	it('rejects traversal, empty assets, and malformed viewBox values', () => {
 		const root = fixture();
 		expect(() =>
@@ -58,6 +59,7 @@ describe('packed icon validation', () => {
 			).toThrow('usable viewBox');
 		}
 	});
+
 	it('rejects missing and non-file icon declarations', () => {
 		const root = fixture();
 		expect(() =>
@@ -66,5 +68,25 @@ describe('packed icon validation', () => {
 		expect(() =>
 			assertRegistrationIcons(root, 'dist/credentials/Test.js', 'fa:cube', 'test'),
 		).toThrow('file: SVG or PNG');
+	});
+
+	it('validates actual emdash icons in repository', () => {
+		const root = resolve(import.meta.dirname, '..');
+		expect(() =>
+			assertRegistrationIcons(
+				root,
+				'credentials/EmDashApi.credentials.ts',
+				{ light: 'file:../icons/emdash.svg', dark: 'file:../icons/emdash.dark.svg' },
+				'emdashApi',
+			),
+		).not.toThrow();
+		expect(() =>
+			assertRegistrationIcons(
+				root,
+				'nodes/EmDash/Emdash.node.ts',
+				{ light: 'file:../../icons/emdash.svg', dark: 'file:../../icons/emdash.dark.svg' },
+				'emdash',
+			),
+		).not.toThrow();
 	});
 });
