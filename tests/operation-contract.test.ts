@@ -298,6 +298,42 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Comment Get: requires commentId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'comment',
+				operation: 'get',
+				requiredControls: ['commentId'],
+			}),
+		).not.toThrow();
+
+		// Comment Update Status: requires commentId and status
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'comment',
+				operation: 'updateStatus',
+				requiredControls: ['commentId', 'status'],
+			}),
+		).not.toThrow();
+
+		// Comment Bulk Action: requires ids and action
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'comment',
+				operation: 'bulkAction',
+				requiredControls: ['ids', 'action'],
+			}),
+		).not.toThrow();
+
+		// Comment Delete: requires commentId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'comment',
+				operation: 'delete',
+				requiredControls: ['commentId'],
+			}),
+		).not.toThrow();
+
 		const collection = description.properties.find(({ name }) => name === 'collection');
 		expect(collection?.required).toBe(true);
 		expect(collection?.displayOptions?.show).toEqual({
@@ -318,6 +354,11 @@ describe('EmDash node operation contracts', () => {
 
 		const redirectId = description.properties.find(({ name }) => name === 'redirectId');
 		expect(redirectId?.required).toBe(true);
+
+		const commentId = description.properties.find(({ name }) => name === 'commentId');
+		expect(commentId?.required).toBe(true);
+		expect(commentId?.displayOptions?.show?.resource).toEqual(['comment']);
+		expect(commentId?.displayOptions?.show?.operation).toEqual(['get', 'updateStatus', 'delete']);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {

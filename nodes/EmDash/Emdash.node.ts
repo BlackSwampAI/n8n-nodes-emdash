@@ -1,4 +1,5 @@
 import { NodeConnectionTypes, type INodeType, type INodeTypeDescription } from 'n8n-workflow';
+import { commentDescription } from './resources/comment';
 import { contentDescription } from './resources/content';
 import { mediaDescription } from './resources/media';
 import { redirectDescription } from './resources/redirect';
@@ -44,6 +45,10 @@ export class Emdash implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
+						name: 'Comment',
+						value: 'comment',
+					},
+					{
 						name: 'Content',
 						value: 'content',
 					},
@@ -66,6 +71,7 @@ export class Emdash implements INodeType {
 				],
 				default: 'content',
 			},
+			...commentDescription,
 			...contentDescription,
 			...mediaDescription,
 			...redirectDescription,

@@ -59,7 +59,7 @@ export function unwrapContentItem<T = Record<string, unknown>>(response: unknown
 
 export const cursorPaginationOperations = {
 	pagination: {
-		type: 'generic',
+		type: 'generic' as const,
 		properties: {
 			continue: '={{ !!$response.body?.data?.nextCursor }}',
 			request: {
@@ -205,6 +205,101 @@ export async function prepareMediaUpload(
 		delete requestOptions.headers['Content-Type'];
 		delete requestOptions.headers['content-type'];
 	}
+
+	return requestOptions;
+}
+
+export function parseAndValidateCommentIds(value: unknown): string[] {
+	if (value === null || value === undefined) {
+		throw new Error('At least 1 comment ID is required');
+	}
+
+	let rawList: unknown[];
+	if (Array.isArray(value)) {
+		rawList = value;
+	} else if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			throw new Error('At least 1 comment ID is required');
+		}
+		if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+			let parsed: unknown = null;
+			let isJsonValid = false;
+			try {
+				parsed = JSON.parse(trimmed);
+				isJsonValid = true;
+			} catch {
+				isJsonValid = false;
+			}
+			if (!isJsonValid || !Array.isArray(parsed)) {
+				throw new Error('Comment IDs JSON expression must evaluate to an array');
+			}
+			rawList = parsed;
+		} else {
+			rawList = trimmed.split(',');
+		}
+	} else if (typeof value === 'number') {
+		rawList = [String(value)];
+	} else {
+		throw new Error('Comment IDs must be an array, comma-separated string, or JSON array string');
+	}
+
+	if (rawList.length === 0) {
+		throw new Error('At least 1 comment ID is required');
+	}
+
+	if (rawList.length > 100) {
+		throw new Error(
+			`Cannot process more than 100 comment IDs at once (received ${rawList.length})`,
+		);
+	}
+
+	const ids: string[] = [];
+	for (const item of rawList) {
+		if (item === null || item === undefined) {
+			throw new Error('Comment ID cannot be empty or whitespace');
+		}
+		const str = String(item).trim();
+		if (!str) {
+			throw new Error('Comment ID cannot be empty or whitespace');
+		}
+		ids.push(str);
+	}
+
+	return ids;
+}
+
+export async function validateBulkCommentAction(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawIds: unknown;
+	try {
+		rawIds = this.getNodeParameter('ids', '');
+	} catch {
+		rawIds = '';
+	}
+
+	let action = '';
+	try {
+		action = this.getNodeParameter('action', '') as string;
+	} catch {
+		action = '';
+	}
+
+	const validatedIds = parseAndValidateCommentIds(rawIds);
+
+	if (!action || typeof action !== 'string' || !action.trim()) {
+		throw new Error('Action is required for bulk comment action');
+	}
+
+	requestOptions.body = {
+		...(typeof requestOptions.body === 'object' && requestOptions.body !== null
+			? (requestOptions.body as Record<string, unknown>)
+			: {}),
+		ids: validatedIds,
+		action: action.trim(),
+	};
 
 	return requestOptions;
 }

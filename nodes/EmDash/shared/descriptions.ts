@@ -222,3 +222,18 @@ export const redirectIdProperty: INodeProperties = {
 	},
 	description: 'The ID of the redirect rule',
 };
+
+export const commentIdProperty: INodeProperties = {
+	displayName: 'Comment ID',
+	name: 'commentId',
+	type: 'string',
+	required: true,
+	default: '',
+	displayOptions: {
+		show: {
+			resource: ['comment'],
+			operation: ['get', 'updateStatus', 'delete'],
+		},
+	},
+	description: 'The ID of the comment',
+};
