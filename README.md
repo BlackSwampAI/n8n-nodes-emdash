@@ -134,7 +134,7 @@ The trigger supports the 4 official events emitted by the EmDash Webhook Notifie
 
 - **Content Created** (`content:create`): Fired when a draft content entry is created.
 - **Content Updated** (`content:update`): Fired when an existing content entry is modified or saved.
-- **Content Deleted** (`content:delete`): Fired when a content entry is soft-deleted to trash.
+- **Content Deleted** (`content:delete`): Fired when an entry is moved to Trash or permanently deleted; the current notifier does not distinguish between the two.
 - **Media Uploaded** (`media:upload`): Fired when a media file is uploaded to the media library.
 
 ### Setup Guide

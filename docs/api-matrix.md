@@ -76,7 +76,7 @@ The webhook notifier emits 4 official event types:
 
 1. `content:create`: Dispatched when an entry is created as a draft.
 2. `content:update`: Dispatched when an existing content entry is updated or revised.
-3. `content:delete`: Dispatched when a content entry is soft-deleted to trash.
+3. `content:delete`: Dispatched when an entry is moved to Trash or permanently deleted; the current notifier does not distinguish between the two.
 4. `media:upload`: Dispatched when a media asset is uploaded to the media library.
 
 ### Payload Shape and Envelope Fields
