@@ -14,7 +14,7 @@ describe('raw template safety and tooling', () => {
 			devDependencies: Record<string, string>;
 			n8n: { nodes: string[]; credentials: string[] };
 		};
-		expect(packageJson.private).toBe(true);
+		expect(packageJson.private).toBeFalsy();
 		expect(packageJson.packageManager).toBe('npm@11.19.0');
 		expect(packageJson.engines.node).toBe('>=22.22.0');
 		expect(packageJson.devDependencies).toMatchObject({
@@ -26,30 +26,31 @@ describe('raw template safety and tooling', () => {
 			typescript: '5.9.3',
 			vitest: '4.1.11',
 		});
-		expect(packageJson.n8n.nodes).toEqual(['dist/nodes/GithubIssues/GithubIssues.node.js']);
-		expect(packageJson.n8n.credentials).toEqual([
-			'dist/credentials/GithubIssuesApi.credentials.js',
-			'dist/credentials/GithubIssuesOAuth2Api.credentials.js',
-		]);
+		expect(packageJson.n8n.nodes).toEqual(['dist/nodes/EmDash/Emdash.node.js']);
+		expect(packageJson.n8n.credentials).toEqual(['dist/credentials/EmDashApi.credentials.js']);
 	});
 
 	it('uses declarative routing for the default REST example', async () => {
-		const [node, issue, issueComment] = await Promise.all([
-			read('nodes/GithubIssues/GithubIssues.node.ts'),
-			read('nodes/GithubIssues/resources/issue/index.ts'),
-			read('nodes/GithubIssues/resources/issueComment/index.ts'),
+		const [node, content] = await Promise.all([
+			read('nodes/EmDash/Emdash.node.ts'),
+			read('nodes/EmDash/resources/content/index.ts'),
 		]);
 		expect(node).toContain('requestDefaults:');
-		expect(`${issue}\n${issueComment}`).toContain('routing:');
+		expect(content).toContain('routing:');
 		expect(node).not.toMatch(/\bexecute\s*[=(:]/);
 		for (const removedExamplePath of [
 			'Example.node.ts',
 			'Example.node.json',
 			'example.svg',
 			'example.dark.svg',
+			'GithubIssues.node.ts',
+			'GithubIssues.node.json',
 		]) {
 			await expect(
 				access(new URL(`../nodes/Example/${removedExamplePath}`, import.meta.url)),
+			).rejects.toThrow();
+			await expect(
+				access(new URL(`../nodes/GithubIssues/${removedExamplePath}`, import.meta.url)),
 			).rejects.toThrow();
 		}
 	});
@@ -82,8 +83,8 @@ describe('raw template safety and tooling', () => {
 		const [agents, readme, apiMatrix, testing, handoff] = await Promise.all([
 			read('AGENTS.md'),
 			read('README.md'),
-			read('docs/API_MATRIX_TEMPLATE.md'),
-			read('docs/TESTING_TEMPLATE.md'),
+			read('docs/api-matrix.md'),
+			read('docs/testing.md'),
 			read('docs/BATCH_HANDOFF_TEMPLATE.md'),
 		]);
 		for (const policy of [agents, readme]) {
@@ -181,8 +182,6 @@ describe('raw template safety and tooling', () => {
 		expect(await read('scripts/node-load-smoke.mjs')).toContain(
 			'Packaged SVG icon needs a usable viewBox',
 		);
-		expect(await read('docs/BRANDING_TEMPLATE.md')).toContain(
-			'Creator Portal card version and logo',
-		);
+		expect(await read('docs/branding.md')).toContain('Creator Portal card version and logo');
 	});
 });

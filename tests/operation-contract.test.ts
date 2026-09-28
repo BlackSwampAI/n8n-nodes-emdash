@@ -1,46 +1,342 @@
 import { describe, expect, it } from 'vitest';
-import { GithubIssues } from '../nodes/GithubIssues/GithubIssues.node';
+import { EmDash } from '../nodes/EmDash/Emdash.node';
 import {
 	assertRequiredControls,
 	normalizeResourceLocator,
 	requireNonBlankDefaults,
 } from './helpers/operation-contract';
 
-describe('reusable node operation contracts', () => {
+describe('EmDash node operation contracts', () => {
 	it('checks required controls against actual display conditions', () => {
-		const description = new GithubIssues().description;
+		const description = new EmDash().description;
+
+		// Content Create: requires collection and data
 		expect(() =>
 			assertRequiredControls(description, {
-				resource: 'issue',
+				resource: 'content',
 				operation: 'create',
-				requiredControls: ['title'],
+				requiredControls: ['collection', 'data'],
 			}),
 		).not.toThrow();
-		const title = description.properties.find(({ name }) => name === 'title');
-		expect(title?.required).toBe(true);
-		expect(title?.displayOptions?.show).toEqual({
-			resource: ['issue'],
-			operation: ['create'],
+
+		// Content Get: requires collection and id
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'get',
+				requiredControls: ['collection', 'id'],
+			}),
+		).not.toThrow();
+
+		// Content Update: requires collection, id, and data
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'update',
+				requiredControls: ['collection', 'id', 'data'],
+			}),
+		).not.toThrow();
+
+		// Content Schedule: requires collection, id, and scheduledAt
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'schedule',
+				requiredControls: ['collection', 'id', 'scheduledAt'],
+			}),
+		).not.toThrow();
+
+		// Content Set Content Terms: requires collection, id, taxonomy, and termIds
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'setContentTerms',
+				requiredControls: ['collection', 'id', 'taxonomy', 'termIds'],
+			}),
+		).not.toThrow();
+
+		// Media Get: requires mediaId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'get',
+				requiredControls: ['mediaId'],
+			}),
+		).not.toThrow();
+
+		// Media Update: requires mediaId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'update',
+				requiredControls: ['mediaId'],
+			}),
+		).not.toThrow();
+
+		// Media Delete: requires mediaId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'delete',
+				requiredControls: ['mediaId'],
+			}),
+		).not.toThrow();
+
+		// Media Get Usage: requires mediaId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'getUsage',
+				requiredControls: ['mediaId'],
+			}),
+		).not.toThrow();
+
+		// Media Upload: requires binaryPropertyName
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'upload',
+				requiredControls: ['binaryPropertyName'],
+			}),
+		).not.toThrow();
+
+		// Media Folder Get: requires folderId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'getFolder',
+				requiredControls: ['folderId'],
+			}),
+		).not.toThrow();
+
+		// Media Folder Create: requires name
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'createFolder',
+				requiredControls: ['name'],
+			}),
+		).not.toThrow();
+
+		// Media Folder Update: requires folderId and name
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'updateFolder',
+				requiredControls: ['folderId', 'name'],
+			}),
+		).not.toThrow();
+
+		// Media Folder Delete: requires folderId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'deleteFolder',
+				requiredControls: ['folderId'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Get: requires taxonomy
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'getTaxonomy',
+				requiredControls: ['taxonomy'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Update: requires taxonomy
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'updateTaxonomy',
+				requiredControls: ['taxonomy'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Delete: requires taxonomy
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'deleteTaxonomy',
+				requiredControls: ['taxonomy'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Get Many Terms: requires taxonomy
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'getAllTerms',
+				requiredControls: ['taxonomy'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Get Term: requires taxonomy and termSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'getTerm',
+				requiredControls: ['taxonomy', 'termSlug'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Create Term: requires taxonomy and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'createTerm',
+				requiredControls: ['taxonomy', 'label'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Update Term: requires taxonomy and termSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'updateTerm',
+				requiredControls: ['taxonomy', 'termSlug'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Delete Term: requires taxonomy and termSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'deleteTerm',
+				requiredControls: ['taxonomy', 'termSlug'],
+			}),
+		).not.toThrow();
+
+		// Taxonomy Reorder Terms: requires taxonomy and ids
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'taxonomy',
+				operation: 'reorderTerms',
+				requiredControls: ['taxonomy', 'ids'],
+			}),
+		).not.toThrow();
+
+		// Search: requires q
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'search',
+				operation: 'search',
+				requiredControls: ['q'],
+			}),
+		).not.toThrow();
+
+		// Search Suggest: requires q
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'search',
+				operation: 'suggest',
+				requiredControls: ['q'],
+			}),
+		).not.toThrow();
+
+		// Search Rebuild Index: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'search',
+				operation: 'rebuildIndex',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Search Enable: requires collection and enabled
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'search',
+				operation: 'enableSearch',
+				requiredControls: ['collection', 'enabled'],
+			}),
+		).not.toThrow();
+
+		// Redirect Get: requires redirectId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'redirect',
+				operation: 'getRedirect',
+				requiredControls: ['redirectId'],
+			}),
+		).not.toThrow();
+
+		// Redirect Create: requires source
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'redirect',
+				operation: 'createRedirect',
+				requiredControls: ['source'],
+			}),
+		).not.toThrow();
+
+		// Redirect Update: requires redirectId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'redirect',
+				operation: 'updateRedirect',
+				requiredControls: ['redirectId'],
+			}),
+		).not.toThrow();
+
+		// Redirect Delete: requires redirectId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'redirect',
+				operation: 'deleteRedirect',
+				requiredControls: ['redirectId'],
+			}),
+		).not.toThrow();
+
+		// Redirect Prune 404 Log: requires olderThan
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'redirect',
+				operation: 'prune404Log',
+				requiredControls: ['olderThan'],
+			}),
+		).not.toThrow();
+
+		const collection = description.properties.find(({ name }) => name === 'collection');
+		expect(collection?.required).toBe(true);
+		expect(collection?.displayOptions?.show).toEqual({
+			resource: ['content'],
 		});
+
+		const mediaId = description.properties.find(({ name }) => name === 'mediaId');
+		expect(mediaId?.required).toBe(true);
+
+		const folderId = description.properties.find(({ name }) => name === 'folderId');
+		expect(folderId?.required).toBe(true);
+
+		const taxonomy = description.properties.find(({ name }) => name === 'taxonomy');
+		expect(taxonomy?.required).toBe(true);
+
+		const termSlug = description.properties.find(({ name }) => name === 'termSlug');
+		expect(termSlug?.required).toBe(true);
+
+		const redirectId = description.properties.find(({ name }) => name === 'redirectId');
+		expect(redirectId?.required).toBe(true);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {
-		expect(normalizeResourceLocator(' manual-id ', 'Example')).toBe('manual-id');
-		expect(normalizeResourceLocator({ mode: 'list', value: ' listed-id ' }, 'Example')).toBe(
-			'listed-id',
+		expect(normalizeResourceLocator(' posts ', 'Collection')).toBe('posts');
+		expect(normalizeResourceLocator({ mode: 'list', value: ' articles ' }, 'Collection')).toBe(
+			'articles',
 		);
-		expect(() => normalizeResourceLocator({ mode: 'list' }, 'Example')).toThrow(
-			'Example must contain a non-empty list or manual value',
+		expect(() => normalizeResourceLocator({ mode: 'list' }, 'Collection')).toThrow(
+			'Collection must contain a non-empty list or manual value',
 		);
 	});
 
-	it('demonstrates a test-contract preflight before a mocked transport call', () => {
+	it('demonstrates a test-contract preflight before a transport call', () => {
 		let transportCalls = 0;
 		const execute = () => {
-			requireNonBlankDefaults({ name: '' }, ['name']);
+			requireNonBlankDefaults({ collection: '' }, ['collection']);
 			transportCalls += 1;
 		};
-		expect(execute).toThrow('name is required before transport');
+		expect(execute).toThrow('collection is required before transport');
 		expect(transportCalls).toBe(0);
 	});
 });

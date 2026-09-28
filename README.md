@@ -1,84 +1,150 @@
-# Black Swamp n8n community-node template
+# n8n-nodes-emdash
 
-A fail-closed TypeScript starter for production-quality n8n community integrations. It uses a declarative GitHub Issues implementation as the canonical REST example and adds strict Vitest tests, release audits, and provenance-ready GitHub Actions.
+Consume and manage content, media, taxonomies, search, and URL redirects from EmDash CMS in n8n workflows.
 
-> [!WARNING]
-> This repository is a template, not a publishable integration. `private: true` intentionally blocks publication. The examples, identity, and this README must be removed or adapted after generating a project.
+> This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
-## Start from the template
+[Installation](#installation) · [Compatibility](#compatibility) · [Credentials](#credentials) · [Operations](#operations) · [Usage](#usage) · [Troubleshooting](#troubleshooting) · [Resources](#resources) · [Black Swamp AI](https://blackswampai.com/n8n-nodes/emdash/)
 
-1. Select **Use this template → Create a new repository** on GitHub.
-2. Create the final public repository, then clone it.
-3. Work in bounded, reviewed batches; do not create a version tag during initialization.
+## Installation
 
-```sh
-git clone https://github.com/YOUR-OWNER/YOUR-REPOSITORY.git
-cd YOUR-REPOSITORY
-npm ci
-```
+On self-hosted n8n instances, install this community node through the n8n web interface:
 
-## Deterministic initialization checklist
+1. Open **Settings → Community Nodes** in your n8n workspace.
+2. Select **Install a community node**.
+3. Enter `@blackswampai/n8n-nodes-emdash` in the **npm package name** field.
+4. Agree to the risks of installing third-party code and select **Install**.
 
-- Choose the final GitHub repository and scoped or unscoped `n8n-nodes-*` npm name.
-- Replace package name, description, author, homepage, repository, keywords, and node metadata URLs/categories. Black Swamp AI packages use `https://blackswampai.com/n8n-nodes/<slug>/` as their npm homepage.
-- Choose and document exactly one distribution state: verified-node discovery, manual self-hosted **Settings → Community Nodes**, or private/unavailable. Verification status must come from the actual n8n distribution state, not package metadata.
-- Replace this file with `README_TEMPLATE.md`, rename it to `README.md`, and resolve every placeholder.
-- Replace or adapt the GitHub Issues node, credentials, icons, and registrations.
-- Start ordinary REST API nodes with declarative routing. Evaluate routing, expressions, pagination, `preSend`, and `postReceive` before choosing programmatic execution, and document any exception in the API matrix.
-- Replace or remove raw-template invariant tests, especially `tests/template.test.ts`, when removing `private: true` and the example registrations; add product-specific invariants in their place.
-- Copy and complete `docs/API_MATRIX_TEMPLATE.md` as `docs/api-matrix.md`, `docs/TESTING_TEMPLATE.md` as `docs/testing.md`, and `docs/BRANDING_TEMPLATE.md` as `docs/branding.md`. Remove the uppercase template copies after migration; unresolved placeholders or missing final documents fail the generated repository's release audit.
-- Register every intended compiled node and credential using stable `dist/` paths.
-- Keep `private: true` until identity, documentation, tests, and registration are final; then remove it.
-- Run `npm install` once after identity/tooling changes and commit the regenerated lockfile.
-- Start follow-up/migration branches from the current post-squash `main`. Do not replay an already-squashed feature branch.
-- Inspect inherited `.npmrc` files. `engine-strict=true` must not reject either the Node 22.22.0 or Node 24 CI lane.
-- Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm run package:check`.
-- Install or load the dry-run package in a disposable n8n instance before release.
-- Never tag early. Only an explicitly authorized, reviewed release commit receives an immutable version tag.
+For additional guidance on managing community nodes, see the [n8n Community Nodes installation documentation](https://docs.n8n.io/integrations/community-nodes/installation-and-management/gui-installation/).
 
-## Declarative-first implementation policy
+## Compatibility
 
-`nodes/GithubIssues/` and `credentials/` are the sole canonical example. They demonstrate a declarative REST API node, list search, pagination, PAT, and OAuth credentials.
+| Surface             | Tested baseline    | Notes                                    |
+| ------------------- | ------------------ | ---------------------------------------- |
+| n8n                 | 1.82.0+            | Standard declarative routing and hooks   |
+| EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint     |
+| Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes. |
 
-Use declarative routing by default for ordinary REST APIs. First evaluate routing, expressions, pagination, `preSend`, and `postReceive`; these cover many unusual request bodies, response wrappers, and pagination schemes without a custom `execute` method.
+## Credentials
 
-Choose programmatic style only when a specific requirement calls for it, such as a trigger, GraphQL or another non-REST protocol, an external runtime dependency, incoming-data transformation, full node versioning, or behavior declarative routing cannot safely express. Record that requirement and the rejected declarative options in the API matrix. Generic "weird JSON" is not sufficient evidence.
+To authenticate with your EmDash instance:
 
-The GitHub Issues files are learning fixtures. Shipping their names, registrations, or credentials in an unrelated integration is a release-audit failure.
+1. In n8n, create an **EmDash API** credential.
+2. **Site URL**: Enter the root URL of your EmDash installation (for example, `https://cms.example.com`). The node automatically normalizes trailing slashes and routes requests through the `/_emdash/api` endpoint prefix.
+3. **API Token**: Enter a Personal Access Token (PAT) generated in your EmDash administrative panel.
 
-## Development commands
+Ensure your token has appropriate permission scopes for the operations your workflow uses:
 
-| Command                 | Purpose                                             |
-| ----------------------- | --------------------------------------------------- |
-| `npm run dev`           | Run the local n8n node development environment      |
-| `npm run format:check`  | Check formatting                                    |
-| `npm run lint`          | Run n8n community-node lint rules                   |
-| `npm run typecheck`     | Strictly check production and test TypeScript       |
-| `npm test`              | Run all `*.test.ts` files with Vitest               |
-| `npm run build`         | Compile nodes and copy static assets                |
-| `npm run scan:source`   | Apply the pinned official scanner to source/build   |
-| `npm run release:check` | Validate template mode or final release identity    |
-| `npm run package:check` | Audit and inspect the dry-run npm tarball boundary  |
-| `npm run smoke:load`    | Load every compiled package registration            |
-| `npm run smoke:install` | Install and load the tarball in an isolated project |
+- `content:read`, `content:write`, `content:publish` for Content operations
+- `media:read`, `media:write` for Media files and folders
+- `taxonomy:read`, `taxonomy:write` for Taxonomy definitions and terms
+- `search:read`, `search:admin` for Full-Text Search queries, suggestions, indexing, and rebuilds
+- `redirects:read`, `redirects:write` for URL redirect rule management and 404 access log management
 
-The tag workflow separates one-time npm publication from a dependent registry/provenance verifier. If npm publication succeeds and only verification fails, rerun only failed jobs; never rerun the successful publish job for that immutable version.
+## Operations
 
-Read `RELEASING.md` before changing `private`, creating a tag, or configuring npm publishing.
-Use `docs/BATCH_HANDOFF_TEMPLATE.md` to keep implementation work bounded and evidence-driven. Generated repositories do not inherit later template improvements; follow `docs/TEMPLATE_MIGRATIONS.md` and retain `.blackswamp/template.json` to track explicitly adopted migrations.
+The EmDash community node provides 51 operations across 5 core resources:
 
-Reusable project templates:
+### Content (16 operations)
 
-- `docs/API_MATRIX_TEMPLATE.md`
-- `docs/TESTING_TEMPLATE.md`
-- `docs/BRANDING_TEMPLATE.md`
+- **Get Many** (`getAll`): Retrieve entries in a collection with cursor pagination, publication status filtering, and date ranges.
+- **Get** (`get`): Retrieve a single content item by ID or URL slug.
+- **Create** (`create`): Create a draft content entry with JSON data, SEO metadata, locale, and taxonomy terms.
+- **Update** (`update`): Mutate existing content with optimistic concurrency control (`_rev`).
+- **Delete** (`delete`): Soft delete an entry to trash.
+- **Publish** (`publish`): Promote draft changes to live version.
+- **Unpublish** (`unpublish`): Revert published live entry to draft.
+- **Schedule** (`schedule`): Set a future publication timestamp.
+- **Unschedule** (`unschedule`): Cancel scheduled publication.
+- **Duplicate** (`duplicate`): Clone an existing entry into a new draft.
+- **Restore** (`restore`): Restore a trashed entry.
+- **Permanently Delete** (`permanentDelete`): Hard delete a trashed entry.
+- **Compare Draft and Live** (`compare`): Diff draft changes against the live version.
+- **Discard Draft** (`discardDraft`): Discard pending draft edits and revert to live version.
+- **Get Content Terms** (`getContentTerms`): Retrieve taxonomy terms assigned to an entry.
+- **Set Content Terms** (`setContentTerms`): Replace taxonomy term assignments on an entry.
 
-## Upstream resources
+### Media (11 operations)
 
-- [n8n node development](https://docs.n8n.io/integrations/creating-nodes/)
-- [Choose a node-building style](https://docs.n8n.io/connect/create-nodes/plan-your-node/choose-a-node-building-style)
-- [Community-node verification](https://docs.n8n.io/integrations/creating-nodes/build/reference/verification-guidelines/)
-- [npm Trusted Publishers](https://docs.npmjs.com/trusted-publishers/)
+- **Get Many** (`getAll`): List media files with cursor pagination and folder filtering.
+- **Get** (`get`): Get metadata for a media file by ID.
+- **Upload** (`upload`): Upload binary files directly via multipart form data.
+- **Update Metadata** (`update`): Update media title, alt text, caption, focal points, dimensions, or folder.
+- **Delete** (`delete`): Delete a media record and associated storage file.
+- **Get Usage** (`getUsage`): Retrieve content entries referencing a media file.
+- **Get Many Folders** (`getAllFolders`): List media folders.
+- **Get Folder** (`getFolder`): Get single media folder metadata by ID.
+- **Create Folder** (`createFolder`): Create a new folder to organize media assets.
+- **Update Folder** (`updateFolder`): Rename or move a media folder.
+- **Delete Folder** (`deleteFolder`): Delete an empty media folder.
+
+### Taxonomy (10 operations)
+
+- **Get Many** (`getAllTaxonomies`): List all registered taxonomies.
+- **Get** (`getTaxonomy`): Retrieve taxonomy schema and metadata.
+- **Update** (`updateTaxonomy`): Update taxonomy label and description.
+- **Delete** (`deleteTaxonomy`): Delete taxonomy definition and its terms.
+- **Get Many Terms** (`getAllTerms`): List terms within a taxonomy.
+- **Get Term** (`getTerm`): Retrieve single taxonomy term by slug.
+- **Create Term** (`createTerm`): Create a new term with label, slug, description, parent, and locale.
+- **Update Term** (`updateTerm`): Update an existing term by slug.
+- **Delete Term** (`deleteTerm`): Delete a term from a taxonomy.
+- **Reorder Terms** (`reorderTerms`): Update display ordering of taxonomy terms (`POST /taxonomies/{name}/reorder`).
+
+### Search (5 operations)
+
+- **Search** (`search`): Full-text search across indexed content with cursor pagination, collections filter, locale, status, and scope (`all` or `title`).
+- **Suggest** (`suggest`): Autocompletion prefix suggestions with collection and locale filters.
+- **Get Stats** (`getStats`): Retrieve search index statistics and document counts.
+- **Rebuild Index** (`rebuildIndex`): Trigger a search index rebuild for a specific collection.
+- **Enable / Configure Search** (`enableSearch`): Configure SQLite FTS5 search indexing for a collection, including tokenizer strategies (`porter unicode61`, `unicode61`, `trigram`) and column weight mapping.
+
+### Redirect (9 operations)
+
+- **Get Many** (`getAllRedirects`): List URL redirect rules with cursor pagination and search, group, enabled, auto filters.
+- **Get** (`getRedirect`): Retrieve redirect rule by ID.
+- **Create** (`createRedirect`): Create a redirect rule (`301`, `302`, `307`, `308`, `410`, `451`).
+- **Update** (`updateRedirect`): Update redirect rule source, destination, status code, enabled state, or group.
+- **Delete** (`deleteRedirect`): Delete a redirect rule by ID.
+- **Get 404 Entries** (`get404Entries`): Retrieve recorded 404 Not Found error entries with cursor pagination and search filter.
+- **Get 404 Summary** (`get404Summary`): Retrieve aggregation summary of top 404 error paths.
+- **Prune 404 Log** (`prune404Log`): Delete 404 error log entries older than an ISO 8601 datetime threshold.
+- **Clear All 404 Entries** (`clear404Log`): Destructively delete all recorded 404 log entries.
+
+## Usage
+
+### Declarative architecture
+
+This integration relies on declarative routing throughout the node definition. Binary uploads use `preSend` hooks to construct multipart form payloads directly in memory, and response envelopes use `postReceive` hooks to unwrap API payloads. Any irregular or nested API structures (such as generic "weird JSON" payloads) are addressed declaratively with JMESPath or parameter expressions rather than requiring programmatic execution.
+
+### Dynamic collection discovery
+
+Collection, folder, and taxonomy fields use n8n resource locators. You can select items interactively from a live EmDash instance or toggle to manual mode to provide dynamic expressions or IDs from upstream workflow nodes.
+
+### Cursor pagination
+
+List operations support EmDash opaque cursor pagination. Set **Return All** to `true` to fetch all available records automatically, or disable it and specify a custom **Limit**.
+
+### Concurrency control
+
+EmDash employs optimistic locking for draft updates and publication actions. Content operations return a revision token (`_rev`). When performing automated updates, pass the current `_rev` to avoid conflicting with concurrent editor changes.
+
+## Troubleshooting
+
+- **Token permissions**: Ensure your Personal Access Token includes the required scopes for the operations invoked. Operations that modify system settings (such as index rebuilds or 404 pruning) require administrative scopes (`search:admin`, `redirects:write`).
+- **Base URL and routing**: Enter the bare root URL of your EmDash installation (for example, `https://cms.example.com`). The node automatically normalizes trailing slashes and prefixes paths with `/_emdash/api`.
+- **Concurrent edits**: If an update fails with an `ENTRY_LOCKED` or revision mismatch error, fetch the latest content item revision using **Get** to obtain the current `_rev` token before retrying.
+- **Report defects**: File reproducible bug reports on [GitHub Issues](https://github.com/BlackSwampAI/n8n-nodes-emdash/issues) without including credentials or sensitive tokens.
+
+## Resources
+
+- [Black Swamp AI package page](https://blackswampai.com/n8n-nodes/emdash/)
+- [n8n community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
+- [EmDash Documentation](https://github.com/emdash-cms/emdash#readme)
+- [Changelog](CHANGELOG.md)
+- [API Matrix](docs/api-matrix.md)
+- [Testing Documentation](docs/testing.md)
+- [Branding Guide](docs/branding.md)
 
 ## License
 
