@@ -310,3 +310,128 @@ export async function validateBulkCommentAction(
 
 	return requestOptions;
 }
+
+export interface ReorderMenuItem {
+	id: string;
+	parentId: string | null;
+	sortOrder: number;
+}
+
+export function parseAndValidateReorderMenuItems(value: unknown): ReorderMenuItem[] {
+	if (value === null || value === undefined) {
+		throw new Error('Items must be an array or JSON string');
+	}
+
+	let rawList: unknown[];
+	if (Array.isArray(value)) {
+		rawList = value;
+	} else if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			throw new Error('Items must be an array or JSON string');
+		}
+		let parsed: unknown;
+		let jsonError: string | undefined;
+		try {
+			parsed = JSON.parse(trimmed);
+		} catch (err) {
+			jsonError = (err as Error).message;
+		}
+		if (jsonError) {
+			throw new Error(`Invalid JSON for items: ${jsonError}`);
+		}
+		if (!Array.isArray(parsed)) {
+			throw new Error('Items JSON expression must evaluate to an array');
+		}
+		rawList = parsed;
+	} else {
+		throw new Error('Items must be an array or JSON string');
+	}
+
+	if (rawList.length === 0) {
+		throw new Error('At least 1 item is required to reorder');
+	}
+
+	const validatedItems: ReorderMenuItem[] = [];
+
+	for (let i = 0; i < rawList.length; i++) {
+		const rawItem = rawList[i];
+
+		if (typeof rawItem !== 'object' || rawItem === null || Array.isArray(rawItem)) {
+			throw new Error(`Item at index ${i} must be an object (received ${typeof rawItem})`);
+		}
+
+		const item = rawItem as Record<string, unknown>;
+
+		// Validate id: non-empty string, no empty/whitespace, no coercion
+		if (typeof item.id !== 'string') {
+			throw new Error(
+				`Item at index ${i} has invalid id: must be a non-empty string (received ${typeof item.id})`,
+			);
+		}
+		const trimmedId = item.id.trim();
+		if (!trimmedId) {
+			throw new Error(`Item at index ${i} has blank id: cannot be empty or whitespace`);
+		}
+
+		// Validate parentId: string or null, must not be missing
+		if (!('parentId' in item) || item.parentId === undefined) {
+			throw new Error(`Item at index ${i} is missing required property "parentId"`);
+		}
+		if (item.parentId !== null && typeof item.parentId !== 'string') {
+			throw new Error(
+				`Item at index ${i} has invalid parentId type: must be a string or null (received ${typeof item.parentId})`,
+			);
+		}
+		let parentId: string | null = null;
+		if (typeof item.parentId === 'string') {
+			const trimmedParent = item.parentId.trim();
+			if (!trimmedParent) {
+				throw new Error(`Item at index ${i} has blank parentId: use null for root items`);
+			}
+			parentId = trimmedParent;
+		}
+
+		// Validate sortOrder: integer >= 0, no coercion
+		if (
+			typeof item.sortOrder !== 'number' ||
+			!Number.isInteger(item.sortOrder) ||
+			item.sortOrder < 0
+		) {
+			throw new Error(
+				`Item at index ${i} has invalid sortOrder: must be an integer >= 0 (received ${item.sortOrder})`,
+			);
+		}
+
+		validatedItems.push({
+			id: trimmedId,
+			parentId,
+			sortOrder: item.sortOrder,
+		});
+	}
+
+	return validatedItems;
+}
+
+export async function validateReorderMenuItems(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawItems: unknown;
+	try {
+		rawItems = this.getNodeParameter('items', []);
+	} catch {
+		rawItems = [];
+	}
+
+	const validatedItems = parseAndValidateReorderMenuItems(rawItems);
+
+	requestOptions.body = {
+		...(typeof requestOptions.body === 'object' && requestOptions.body !== null
+			? (requestOptions.body as Record<string, unknown>)
+			: {}),
+		items: validatedItems,
+	};
+
+	return requestOptions;
+}

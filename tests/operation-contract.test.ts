@@ -334,6 +334,87 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Menu GetAll: requires no parameters
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'getAll',
+				requiredControls: [],
+			}),
+		).not.toThrow();
+
+		// Menu Get: requires menu
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'get',
+				requiredControls: ['menu'],
+			}),
+		).not.toThrow();
+
+		// Menu Create: requires name and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'create',
+				requiredControls: ['name', 'label'],
+			}),
+		).not.toThrow();
+
+		// Menu Update: requires menu and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'update',
+				requiredControls: ['menu', 'label'],
+			}),
+		).not.toThrow();
+
+		// Menu Delete: requires menu
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'delete',
+				requiredControls: ['menu'],
+			}),
+		).not.toThrow();
+
+		// Menu Create Item: requires menu, type, and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'createItem',
+				requiredControls: ['menu', 'type', 'label'],
+			}),
+		).not.toThrow();
+
+		// Menu Update Item: requires menu and itemId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'updateItem',
+				requiredControls: ['menu', 'itemId'],
+			}),
+		).not.toThrow();
+
+		// Menu Delete Item: requires menu and itemId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'deleteItem',
+				requiredControls: ['menu', 'itemId'],
+			}),
+		).not.toThrow();
+
+		// Menu Reorder Items: requires menu and items
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'menu',
+				operation: 'reorderItems',
+				requiredControls: ['menu', 'items'],
+			}),
+		).not.toThrow();
+
 		const collection = description.properties.find(({ name }) => name === 'collection');
 		expect(collection?.required).toBe(true);
 		expect(collection?.displayOptions?.show).toEqual({
@@ -359,6 +440,24 @@ describe('EmDash node operation contracts', () => {
 		expect(commentId?.required).toBe(true);
 		expect(commentId?.displayOptions?.show?.resource).toEqual(['comment']);
 		expect(commentId?.displayOptions?.show?.operation).toEqual(['get', 'updateStatus', 'delete']);
+
+		const menu = description.properties.find(({ name }) => name === 'menu');
+		expect(menu?.required).toBe(true);
+		expect(menu?.displayOptions?.show?.resource).toEqual(['menu']);
+		expect(menu?.displayOptions?.show?.operation).toEqual([
+			'get',
+			'update',
+			'delete',
+			'createItem',
+			'updateItem',
+			'deleteItem',
+			'reorderItems',
+		]);
+
+		const itemId = description.properties.find(({ name }) => name === 'itemId');
+		expect(itemId?.required).toBe(true);
+		expect(itemId?.displayOptions?.show?.resource).toEqual(['menu']);
+		expect(itemId?.displayOptions?.show?.operation).toEqual(['updateItem', 'deleteItem']);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {

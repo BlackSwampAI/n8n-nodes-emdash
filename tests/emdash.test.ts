@@ -10,7 +10,10 @@ import {
 	prepareMediaUpload,
 	parseAndValidateCommentIds,
 	validateBulkCommentAction,
+	parseAndValidateReorderMenuItems,
+	validateReorderMenuItems,
 } from '../nodes/EmDash/shared/transport';
+import { getMenus } from '../nodes/EmDash/listSearch/getMenus';
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
 describe('EmDash integration tests', () => {
@@ -1281,15 +1284,553 @@ describe('EmDash integration tests', () => {
 		});
 	});
 
+	describe('menu operations routing', () => {
+		const menuOpProp = node.description.properties.find(
+			(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes('menu'),
+		);
+		const options = menuOpProp?.options as INodePropertyOptions[];
+		const getOperation = (val: string) => options?.find((o) => o.value === val);
+
+		it('registers Menu operation property with default getAll', () => {
+			expect(menuOpProp).toBeDefined();
+			expect(menuOpProp?.default).toBe('getAll');
+			expect(options).toHaveLength(9);
+		});
+
+		const expectedOperations = [
+			{
+				name: 'getAll',
+				method: 'GET',
+				url: '/menus',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'get',
+				method: 'GET',
+				url: '=/menus/{{$parameter.menu}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'create',
+				method: 'POST',
+				url: '/menus',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'update',
+				method: 'PUT',
+				url: '=/menus/{{$parameter.menu}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'delete',
+				method: 'DELETE',
+				url: '=/menus/{{$parameter.menu}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'createItem',
+				method: 'POST',
+				url: '=/menus/{{$parameter.menu}}/items',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'updateItem',
+				method: 'PUT',
+				url: '=/menus/{{$parameter.menu}}/items/{{$parameter.itemId}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'deleteItem',
+				method: 'DELETE',
+				url: '=/menus/{{$parameter.menu}}/items/{{$parameter.itemId}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'reorderItems',
+				method: 'POST',
+				url: '=/menus/{{$parameter.menu}}/reorder',
+				postReceiveProp: 'data',
+			},
+		];
+
+		it('registers all 9 menu operations with correct HTTP methods and paths', () => {
+			for (const expected of expectedOperations) {
+				const op = getOperation(expected.name);
+				expect(op, `Operation ${expected.name} should exist`).toBeDefined();
+				expect(op?.routing?.request?.method).toBe(expected.method);
+				expect(op?.routing?.request?.url).toBe(expected.url);
+			}
+		});
+
+		it('unwraps data rootProperty for all 9 menu operations', () => {
+			for (const expected of expectedOperations) {
+				const op = getOperation(expected.name);
+				expect(op?.routing?.output?.postReceive).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: expected.postReceiveProp,
+						},
+					},
+				]);
+			}
+		});
+
+		it('configures reorderItems operation with validateReorderMenuItems preSend hook', () => {
+			const reorderOp = getOperation('reorderItems');
+			expect(reorderOp?.routing?.send?.preSend).toEqual([validateReorderMenuItems]);
+		});
+
+		it('places locale query parameter across 8 operations and body parameter on create', () => {
+			const queryOperations = [
+				'getAll',
+				'get',
+				'update',
+				'delete',
+				'createItem',
+				'updateItem',
+				'deleteItem',
+				'reorderItems',
+			];
+
+			for (const op of queryOperations) {
+				const localeProp = node.description.properties.find(
+					(p) =>
+						p.name === 'locale' &&
+						p.displayOptions?.show?.resource?.includes('menu') &&
+						p.displayOptions?.show?.operation?.includes(op),
+				);
+				expect(localeProp, `locale property should exist for ${op}`).toBeDefined();
+				expect(localeProp?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+			}
+
+			// create operation has locale in request body via additionalFields
+			const createAdditional = node.description.properties.find(
+				(p) =>
+					p.name === 'additionalFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('create'),
+			);
+			expect(createAdditional).toBeDefined();
+			const localeBody = (createAdditional?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
+			expect(localeBody).toBeDefined();
+			expect(localeBody?.routing?.send?.type).toBe('body');
+			expect(localeBody?.routing?.send?.property).toBe('locale');
+		});
+
+		it('configures menu create parameters with name, label, and additionalFields', () => {
+			const nameProp = node.description.properties.find(
+				(p) =>
+					p.name === 'name' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('create'),
+			);
+			expect(nameProp?.required).toBe(true);
+			expect(nameProp?.routing?.send?.type).toBe('body');
+			expect(nameProp?.routing?.send?.property).toBe('name');
+
+			const labelProp = node.description.properties.find(
+				(p) =>
+					p.name === 'label' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('create'),
+			);
+			expect(labelProp?.required).toBe(true);
+			expect(labelProp?.routing?.send?.type).toBe('body');
+			expect(labelProp?.routing?.send?.property).toBe('label');
+
+			const additional = node.description.properties.find(
+				(p) =>
+					p.name === 'additionalFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('create'),
+			);
+			const translationOf = (additional?.options as INodeProperties[])?.find(
+				(o) => o.name === 'translationOf',
+			);
+			expect(translationOf).toBeDefined();
+			expect(translationOf?.routing?.send?.type).toBe('body');
+			expect(translationOf?.routing?.send?.property).toBe('translationOf');
+		});
+
+		it('configures menu update parameter with label and does not expose name changing', () => {
+			const labelProp = node.description.properties.find(
+				(p) =>
+					p.name === 'label' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('update'),
+			);
+			expect(labelProp?.required).toBe(true);
+			expect(labelProp?.routing?.send?.type).toBe('body');
+			expect(labelProp?.routing?.send?.property).toBe('label');
+
+			const nameProp = node.description.properties.find(
+				(p) =>
+					p.name === 'name' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('update'),
+			);
+			expect(nameProp).toBeUndefined();
+		});
+
+		it('provides clear destructive warning on menu delete', () => {
+			const deleteOp = getOperation('delete');
+			expect(deleteOp?.description).toContain('does not delete referenced content');
+		});
+
+		it('configures createItem parameters with conditional display for type', () => {
+			const typeProp = node.description.properties.find(
+				(p) =>
+					p.name === 'type' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(typeProp?.required).toBe(true);
+			expect(typeProp?.default).toBe('custom');
+			const typeValues = (typeProp?.options as Array<{ value: string }>).map((o) => o.value);
+			expect(typeValues).toEqual(['collection', 'custom', 'page', 'post', 'taxonomy']);
+
+			const labelProp = node.description.properties.find(
+				(p) =>
+					p.name === 'label' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(labelProp?.required).toBe(true);
+
+			const customUrlProp = node.description.properties.find(
+				(p) =>
+					p.name === 'customUrl' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(customUrlProp?.displayOptions?.show?.type).toEqual(['custom']);
+
+			const refCollProp = node.description.properties.find(
+				(p) =>
+					p.name === 'referenceCollection' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(refCollProp?.displayOptions?.show?.type).toEqual([
+				'collection',
+				'page',
+				'post',
+				'taxonomy',
+			]);
+
+			const refIdProp = node.description.properties.find(
+				(p) =>
+					p.name === 'referenceId' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(refIdProp?.displayOptions?.show?.type).toEqual([
+				'collection',
+				'page',
+				'post',
+				'taxonomy',
+			]);
+
+			const additional = node.description.properties.find(
+				(p) =>
+					p.name === 'additionalFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(additional).toBeDefined();
+			const fieldNames = additional?.options?.map((o) => o.name);
+			expect(fieldNames).toEqual(
+				expect.arrayContaining(['target', 'titleAttr', 'cssClasses', 'parentId', 'sortOrder']),
+			);
+		});
+
+		it('configures updateItem with updateFields and does not expose type or reference properties', () => {
+			const updateFields = node.description.properties.find(
+				(p) =>
+					p.name === 'updateFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('updateItem'),
+			);
+			expect(updateFields).toBeDefined();
+			const names = updateFields?.options?.map((o) => o.name);
+			expect(names).toEqual(
+				expect.arrayContaining([
+					'label',
+					'customUrl',
+					'target',
+					'titleAttr',
+					'cssClasses',
+					'parentId',
+					'sortOrder',
+				]),
+			);
+			expect(names).not.toContain('type');
+			expect(names).not.toContain('referenceCollection');
+			expect(names).not.toContain('referenceId');
+		});
+
+		it('configures updateItem parentId behavior with null conversion for empty/null values', () => {
+			const updateFields = node.description.properties.find(
+				(p) =>
+					p.name === 'updateFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('updateItem'),
+			);
+			const parentIdProp = (updateFields?.options as INodeProperties[])?.find(
+				(o) => o.name === 'parentId',
+			);
+			expect(parentIdProp).toBeDefined();
+			expect(parentIdProp?.routing?.send?.property).toBe('parentId');
+			expect(parentIdProp?.routing?.send?.value).toBe(
+				'={{ $value === "null" || $value === "" ? null : $value }}',
+			);
+
+			// Test expression logic directly
+			const evaluateExpr = ($value: unknown) =>
+				$value === 'null' || $value === '' ? null : $value;
+			expect(evaluateExpr('')).toBe(null);
+			expect(evaluateExpr('null')).toBe(null);
+			expect(evaluateExpr('parent_item_123')).toBe('parent_item_123');
+		});
+
+		it('provides clear non-destructive warning on deleteItem', () => {
+			const deleteItemOp = getOperation('deleteItem');
+			expect(deleteItemOp?.description).toContain('does not delete referenced content');
+		});
+
+		it('wires menuSelect and menuItemIdProperty with required flags', () => {
+			const menu = node.description.properties.find((p) => p.name === 'menu');
+			expect(menu?.required).toBe(true);
+			expect(menu?.type).toBe('resourceLocator');
+			expect(menu?.displayOptions?.show?.resource).toEqual(['menu']);
+
+			const itemId = node.description.properties.find((p) => p.name === 'itemId');
+			expect(itemId?.required).toBe(true);
+			expect(itemId?.type).toBe('string');
+			expect(itemId?.displayOptions?.show?.resource).toEqual(['menu']);
+			expect(itemId?.displayOptions?.show?.operation).toEqual(['updateItem', 'deleteItem']);
+		});
+	});
+
+	describe('parseAndValidateReorderMenuItems and validateReorderMenuItems', () => {
+		const createMockContext = (params: Record<string, unknown>) => ({
+			getNodeParameter: (name: string, fallback?: unknown) =>
+				params[name] !== undefined ? params[name] : fallback,
+		});
+
+		it('validates valid flat reorder array', () => {
+			const items = [
+				{ id: 'item_1', parentId: null, sortOrder: 0 },
+				{ id: 'item_2', parentId: null, sortOrder: 1 },
+			];
+			const result = parseAndValidateReorderMenuItems(items);
+			expect(result).toEqual([
+				{ id: 'item_1', parentId: null, sortOrder: 0 },
+				{ id: 'item_2', parentId: null, sortOrder: 1 },
+			]);
+		});
+
+		it('validates nested hierarchy with string parentId', () => {
+			const items = [
+				{ id: 'item_1', parentId: null, sortOrder: 0 },
+				{ id: 'item_1_child', parentId: 'item_1', sortOrder: 0 },
+			];
+			const result = parseAndValidateReorderMenuItems(items);
+			expect(result).toEqual([
+				{ id: 'item_1', parentId: null, sortOrder: 0 },
+				{ id: 'item_1_child', parentId: 'item_1', sortOrder: 0 },
+			]);
+		});
+
+		it('supports explicit null parentId for root items', () => {
+			const items = [{ id: 'item_root', parentId: null, sortOrder: 0 }];
+			const result = parseAndValidateReorderMenuItems(items);
+			expect(result[0].parentId).toBeNull();
+		});
+
+		it('parses valid JSON string representation', () => {
+			const jsonStr = JSON.stringify([{ id: 'item_1', parentId: null, sortOrder: 0 }]);
+			const result = parseAndValidateReorderMenuItems(jsonStr);
+			expect(result).toEqual([{ id: 'item_1', parentId: null, sortOrder: 0 }]);
+		});
+
+		it('rejects malformed JSON', () => {
+			expect(() => parseAndValidateReorderMenuItems('{ invalid json')).toThrow(
+				/Invalid JSON for items/,
+			);
+		});
+
+		it('rejects JSON that does not evaluate to an array', () => {
+			expect(() => parseAndValidateReorderMenuItems('{"id": "item_1"}')).toThrow(
+				'Items JSON expression must evaluate to an array',
+			);
+		});
+
+		it('rejects empty array or missing input', () => {
+			expect(() => parseAndValidateReorderMenuItems([])).toThrow(
+				'At least 1 item is required to reorder',
+			);
+			expect(() => parseAndValidateReorderMenuItems('')).toThrow(
+				'Items must be an array or JSON string',
+			);
+			expect(() => parseAndValidateReorderMenuItems(null)).toThrow(
+				'Items must be an array or JSON string',
+			);
+			expect(() => parseAndValidateReorderMenuItems(undefined)).toThrow(
+				'Items must be an array or JSON string',
+			);
+		});
+
+		it('rejects blank IDs', () => {
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: '', parentId: null, sortOrder: 0 }]),
+			).toThrow('cannot be empty or whitespace');
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: '   ', parentId: null, sortOrder: 0 }]),
+			).toThrow('cannot be empty or whitespace');
+		});
+
+		it('rejects missing parentId', () => {
+			expect(() => parseAndValidateReorderMenuItems([{ id: 'item_1', sortOrder: 0 }])).toThrow(
+				'is missing required property "parentId"',
+			);
+		});
+
+		it('rejects invalid parentId type', () => {
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: 123, sortOrder: 0 }]),
+			).toThrow(/invalid parentId type: must be a string or null/);
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: true, sortOrder: 0 }]),
+			).toThrow(/invalid parentId type: must be a string or null/);
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: '  ', sortOrder: 0 }]),
+			).toThrow(/blank parentId: use null for root items/);
+		});
+
+		it('rejects negative sortOrder', () => {
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: null, sortOrder: -1 }]),
+			).toThrow(/must be an integer >= 0/);
+		});
+
+		it('rejects fractional sortOrder', () => {
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: null, sortOrder: 1.5 }]),
+			).toThrow(/must be an integer >= 0/);
+		});
+
+		it('rejects arbitrary coerced scalars and non-object items', () => {
+			expect(() => parseAndValidateReorderMenuItems(['item_1'])).toThrow(/must be an object/);
+			expect(() => parseAndValidateReorderMenuItems([123])).toThrow(/must be an object/);
+			expect(() =>
+				parseAndValidateReorderMenuItems([{ id: 123, parentId: null, sortOrder: 0 }]),
+			).toThrow(/invalid id: must be a non-empty string/);
+			expect(() =>
+				parseAndValidateReorderMenuItems([
+					{ id: 'item_1', parentId: null, sortOrder: '0' as never },
+				]),
+			).toThrow(/must be an integer >= 0/);
+		});
+
+		it('validateReorderMenuItems preSend hook populates requestOptions.body.items', async () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+			const items = [
+				{ id: 'item_1', parentId: null, sortOrder: 0 },
+				{ id: 'item_2', parentId: 'item_1', sortOrder: 0 },
+			];
+			const result = await validateReorderMenuItems.call(createMockContext({ items }) as never, {
+				...req,
+			});
+			expect(result.body).toEqual({ items });
+		});
+	});
+
+	describe('getMenus listSearch', () => {
+		it('formats menu items with label, locale, and name clarity', async () => {
+			const mockContext = {
+				getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+				helpers: {
+					httpRequestWithAuthentication: async () => ({
+						success: true,
+						data: [
+							{ name: 'main', label: 'Main Navigation', locale: 'en' },
+							{ name: 'footer', label: 'footer' },
+							{ name: 'sidebar', label: 'Sidebar Links', locale: 'fr' },
+						],
+					}),
+				},
+			};
+
+			const result = await getMenus.call(mockContext as never);
+			expect(result.results).toEqual([
+				{
+					name: 'Main Navigation [en] (main)',
+					value: 'main',
+				},
+				{
+					name: 'footer',
+					value: 'footer',
+				},
+				{
+					name: 'Sidebar Links [fr] (sidebar)',
+					value: 'sidebar',
+				},
+			]);
+		});
+
+		it('filters menus by search query', async () => {
+			const mockContext = {
+				getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+				helpers: {
+					httpRequestWithAuthentication: async () => ({
+						success: true,
+						data: [
+							{ name: 'main', label: 'Main Navigation', locale: 'en' },
+							{ name: 'footer', label: 'Footer Links', locale: 'en' },
+						],
+					}),
+				},
+			};
+
+			const result = await getMenus.call(mockContext as never, 'foot');
+			expect(result.results).toEqual([
+				{
+					name: 'Footer Links [en] (footer)',
+					value: 'footer',
+				},
+			]);
+		});
+
+		it('returns empty results on API error', async () => {
+			const mockContext = {
+				getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+				helpers: {
+					httpRequestWithAuthentication: async () => {
+						throw new Error('Network error');
+					},
+				},
+			};
+
+			const result = await getMenus.call(mockContext as never);
+			expect(result.results).toEqual([]);
+		});
+	});
+
 	describe('resource and operation counts', () => {
-		it('registers Comment resource in resource options', () => {
+		it('registers Comment and Menu resources in resource options', () => {
 			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
 			const options = resourceProp?.options as INodePropertyOptions[];
 			expect(options.some((opt) => opt.value === 'comment' && opt.name === 'Comment')).toBe(true);
+			expect(options.some((opt) => opt.value === 'menu' && opt.name === 'Menu')).toBe(true);
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing 51 operations and adds 6 comment operations for 57 total', () => {
+		it('preserves existing 57 operations and adds 9 menu operations for 66 total', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -1308,25 +1849,27 @@ describe('EmDash integration tests', () => {
 			expect(countsByResource['taxonomy']).toBe(10);
 			expect(countsByResource['search']).toBe(5);
 			expect(countsByResource['redirect']).toBe(9);
-			// Existing 5 resources sum to 51
+			expect(countsByResource['comment']).toBe(6);
+			expect(countsByResource['menu']).toBe(9);
+			// Existing 6 resources sum to 57
 			expect(
 				countsByResource['content'] +
 					countsByResource['media'] +
 					countsByResource['taxonomy'] +
 					countsByResource['search'] +
-					countsByResource['redirect'],
-			).toBe(51);
+					countsByResource['redirect'] +
+					countsByResource['comment'],
+			).toBe(57);
 
-			// Comment resource adds 6
-			expect(countsByResource['comment']).toBe(6);
-			expect(totalOperations).toBe(57);
+			expect(totalOperations).toBe(66);
 		});
 	});
 
 	describe('listSearch methods', () => {
-		it('registers getCollections, getMediaFolders, and getTaxonomies', () => {
+		it('registers getCollections, getMediaFolders, getMenus, and getTaxonomies', () => {
 			expect(node.methods?.listSearch?.getCollections).toBeDefined();
 			expect(node.methods?.listSearch?.getMediaFolders).toBeDefined();
+			expect(node.methods?.listSearch?.getMenus).toBeDefined();
 			expect(node.methods?.listSearch?.getTaxonomies).toBeDefined();
 		});
 	});

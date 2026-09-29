@@ -237,3 +237,59 @@ export const commentIdProperty: INodeProperties = {
 	},
 	description: 'The ID of the comment',
 };
+
+export const menuSelect: INodeProperties = {
+	displayName: 'Menu',
+	name: 'menu',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	modes: [
+		{
+			displayName: 'From List',
+			name: 'list',
+			type: 'list',
+			placeholder: 'Select a menu...',
+			typeOptions: {
+				searchListMethod: 'getMenus',
+				searchable: true,
+			},
+		},
+		{
+			displayName: 'By Name',
+			name: 'id',
+			type: 'string',
+			placeholder: 'e.g. main-navigation',
+		},
+	],
+	displayOptions: {
+		show: {
+			resource: ['menu'],
+			operation: [
+				'get',
+				'update',
+				'delete',
+				'createItem',
+				'updateItem',
+				'deleteItem',
+				'reorderItems',
+			],
+		},
+	},
+	description: 'The name or identifier of the menu',
+};
+
+export const menuItemIdProperty: INodeProperties = {
+	displayName: 'Menu Item ID',
+	name: 'itemId',
+	type: 'string',
+	required: true,
+	default: '',
+	displayOptions: {
+		show: {
+			resource: ['menu'],
+			operation: ['updateItem', 'deleteItem'],
+		},
+	},
+	description: 'The ID of the menu item',
+};
