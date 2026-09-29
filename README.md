@@ -43,7 +43,9 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 
 - **Content operations**: Read queries (`GET`) require `content:read`. Write and mutation operations (including creation, updates, publish, unpublish, schedule, unschedule, duplicate, restore, and permanent delete) require `content:write`. (EmDash does not use a separate `content:publish` scope).
 - **Media operations**: Read queries (`GET`) require `media:read`. Mutations (binary uploads, metadata updates, folder creation, folder rename, and file/folder deletion) require `media:write`.
-- **Menu operations**: Read queries (`GET`) require `content:read` (and `menus:read` RBAC). Write queries (`POST`, `PUT`, `DELETE`) require `menus:manage` PAT scope (`content:write` implicitly grants `menus:manage`; `admin` also grants it; user must satisfy `menus:manage` RBAC). (EmDash does not define `menus:read`, `menu:read`, or `menu:write` PAT scopes).
+- **Menu operations**:
+  - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `menus:manage` (which is also implicitly granted by `content:write` or `admin`). EmDash does NOT define `menus:read`, `menu:read`, or `menu:write` as Personal Access Token scopes.
+  - **RBAC permissions**: The authenticated user must separately possess the `menus:read` capability for reads, and `menus:manage` capability (Editor or Administrator role) for mutations.
 - **Taxonomy operations**: Read queries (`GET`) require `content:read`. Bulk tagging requires `content:write`. Schema mutations and term management require `taxonomies:manage` (implicitly granted by `content:write` or `admin`). (EmDash does not define `taxonomy:read` or `taxonomy:write` scopes).
 - **Search operations**: Queries and prefix suggestions require `content:read`. Administrative operations (rebuilding an index or enabling search on a collection) require `admin`. (EmDash does not define `search:read` or `search:admin` scopes).
 - **Redirect operations**: Neither `redirects:read` nor `redirects:write` exists as a PAT scope. All redirect rules and 404 access log operations require `admin` due to fail-closed middleware scope enforcement.
@@ -214,7 +216,14 @@ The `@emdash-cms/plugin-webhook-notifier` plugin does not currently emit webhook
 
 The Menu resource enables full lifecycle management of EmDash navigation structures, supporting multi-level hierarchies, localized menu variants, and referenced or custom navigation links:
 
-- **Token scope and RBAC**: Reading menus (`GET`) requires `content:read` PAT scope (and `menus:read` RBAC). Creating, updating, deleting, or reordering menus and items requires the `menus:manage` PAT scope. Note that `content:write` and `admin` scopes implicitly grant `menus:manage`, but the authenticated user must also satisfy `menus:manage` RBAC in EmDash. Do not configure invented scopes such as `menus:read`, `menu:read`, or `menu:write`.
+- **Token scope and RBAC**: EmDash enforces two distinct authorization layers:
+  - **Personal Access Token (PAT) Scopes**:
+    - Menu reads (`GET`): requires `content:read`
+    - Menu writes (`POST`, `PUT`, `DELETE`): requires `menus:manage` (or `content:write`, which implicitly grants `menus:manage`, or `admin`)
+    - _Caution_: Do NOT configure invented PAT scopes such as `menus:read`, `menu:read`, or `menu:write` — they do not exist in EmDash's token system.
+  - **Underlying User RBAC Permissions**:
+    - Menu reads: user must have `menus:read` role capability
+    - Menu writes: user must have `menus:manage` role capability (Editor or Administrator)
 - **Menu translations**: When creating a translated menu variant, configure `translationOf` with the canonical menu ID and specify the target `locale` code. The menu `name` must match the canonical menu name. EmDash clones existing navigation items into the new menu and joins it to the canonical translation group.
 - **Custom URL safety**: Navigation items configured with `type: custom` validate URLs through EmDash's upstream `safeHref` sanitizer. Permitted URL schemes include `http`, `https`, `mailto`, `tel`, relative web paths (`/about`), and fragment identifiers (`#contact`). Potentially unsafe protocols (such as `javascript:` or `data:`) are rejected.
 - **Referenced content semantics**: Navigation items linking to CMS entries (`page`, `post`, `taxonomy`, or `collection`) require `referenceCollection` (the target collection slug) and `referenceId`. In EmDash, `referenceId` corresponds to the translation-group identifier of the referenced content rather than an individual revision ID, allowing navigation links to resolve to the appropriate language variant automatically.

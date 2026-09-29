@@ -392,7 +392,10 @@ export function parseAndValidateReorderMenuItems(value: unknown): ReorderMenuIte
 			parentId = trimmedParent;
 		}
 
-		// Validate sortOrder: integer >= 0, no coercion
+		// Validate sortOrder: integer >= 0, no coercion, must not be missing
+		if (!('sortOrder' in item) || item.sortOrder === undefined) {
+			throw new Error(`Item at index ${i} is missing required property "sortOrder"`);
+		}
 		if (
 			typeof item.sortOrder !== 'number' ||
 			!Number.isInteger(item.sortOrder) ||

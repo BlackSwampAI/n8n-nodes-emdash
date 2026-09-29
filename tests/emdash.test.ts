@@ -1700,6 +1700,12 @@ describe('EmDash integration tests', () => {
 			);
 		});
 
+		it('rejects missing sortOrder', () => {
+			expect(() => parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: null }])).toThrow(
+				'is missing required property "sortOrder"',
+			);
+		});
+
 		it('rejects invalid parentId type', () => {
 			expect(() =>
 				parseAndValidateReorderMenuItems([{ id: 'item_1', parentId: 123, sortOrder: 0 }]),
