@@ -1,15 +1,56 @@
-import { NodeConnectionTypes, type INodeType, type INodeTypeDescription } from 'n8n-workflow';
+import {
+	NodeConnectionTypes,
+	type INodePropertyOptions,
+	type INodeType,
+	type INodeTypeDescription,
+} from 'n8n-workflow';
 import { commentDescription } from './resources/comment';
 import { contentDescription } from './resources/content';
 import { mediaDescription } from './resources/media';
 import { menuDescription } from './resources/menu';
 import { redirectDescription } from './resources/redirect';
 import { searchDescription } from './resources/search';
+import { settingsDescription } from './resources/settings';
 import { taxonomyDescription } from './resources/taxonomy';
 import { getCollections } from './listSearch/getCollections';
 import { getMediaFolders } from './listSearch/getMediaFolders';
 import { getMenus } from './listSearch/getMenus';
 import { getTaxonomies } from './listSearch/getTaxonomies';
+
+const resourceOptions: INodePropertyOptions[] = [
+	{
+		name: 'Comment',
+		value: 'comment',
+	},
+	{
+		name: 'Content',
+		value: 'content',
+	},
+	{
+		name: 'Media',
+		value: 'media',
+	},
+	{
+		name: 'Menu',
+		value: 'menu',
+	},
+	{
+		name: 'Redirect',
+		value: 'redirect',
+	},
+	{
+		name: 'Search',
+		value: 'search',
+	},
+	{
+		name: 'Settings',
+		value: 'settings',
+	},
+	{
+		name: 'Taxonomy',
+		value: 'taxonomy',
+	},
+];
 
 export class Emdash implements INodeType {
 	description: INodeTypeDescription = {
@@ -45,36 +86,7 @@ export class Emdash implements INodeType {
 				name: 'resource',
 				type: 'options',
 				noDataExpression: true,
-				options: [
-					{
-						name: 'Comment',
-						value: 'comment',
-					},
-					{
-						name: 'Content',
-						value: 'content',
-					},
-					{
-						name: 'Media',
-						value: 'media',
-					},
-					{
-						name: 'Menu',
-						value: 'menu',
-					},
-					{
-						name: 'Redirect',
-						value: 'redirect',
-					},
-					{
-						name: 'Search',
-						value: 'search',
-					},
-					{
-						name: 'Taxonomy',
-						value: 'taxonomy',
-					},
-				],
+				options: resourceOptions,
 				default: 'content',
 			},
 			...commentDescription,
@@ -83,6 +95,7 @@ export class Emdash implements INodeType {
 			...menuDescription,
 			...redirectDescription,
 			...searchDescription,
+			...settingsDescription,
 			...taxonomyDescription,
 		],
 	};

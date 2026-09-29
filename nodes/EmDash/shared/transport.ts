@@ -438,3 +438,71 @@ export async function validateReorderMenuItems(
 
 	return requestOptions;
 }
+
+export function parseAndValidateSettings(value: unknown): Record<string, unknown> {
+	if (value === null) {
+		throw new Error('Settings must be an object (received null)');
+	}
+	if (value === undefined) {
+		throw new Error('Settings must be an object or JSON string (received undefined)');
+	}
+
+	if (typeof value === 'object') {
+		if (Array.isArray(value)) {
+			throw new Error('Settings must be an object (received array)');
+		}
+		return value as Record<string, unknown>;
+	}
+
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			throw new Error('Settings JSON string cannot be empty');
+		}
+
+		let parsed: unknown;
+		let jsonError: string | undefined;
+		try {
+			parsed = JSON.parse(trimmed);
+		} catch (err) {
+			jsonError = (err as Error).message;
+		}
+		if (jsonError) {
+			throw new Error(`Invalid JSON for settings: ${jsonError}`);
+		}
+
+		if (parsed === null) {
+			throw new Error('Settings JSON expression must evaluate to an object (received null)');
+		}
+		if (Array.isArray(parsed)) {
+			throw new Error('Settings JSON expression must evaluate to an object (received array)');
+		}
+		if (typeof parsed !== 'object') {
+			throw new Error(
+				`Settings JSON expression must evaluate to an object (received ${typeof parsed})`,
+			);
+		}
+
+		return parsed as Record<string, unknown>;
+	}
+
+	throw new Error(`Settings must be an object or JSON string (received ${typeof value})`);
+}
+
+export async function validateUpdateSettings(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawSettings: unknown;
+	try {
+		rawSettings = this.getNodeParameter('settings', {});
+	} catch {
+		rawSettings = {};
+	}
+
+	const validatedSettings = parseAndValidateSettings(rawSettings);
+
+	requestOptions.body = validatedSettings;
+
+	return requestOptions;
+}

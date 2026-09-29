@@ -12,6 +12,8 @@ import {
 	validateBulkCommentAction,
 	parseAndValidateReorderMenuItems,
 	validateReorderMenuItems,
+	parseAndValidateSettings,
+	validateUpdateSettings,
 } from '../nodes/EmDash/shared/transport';
 import { getMenus } from '../nodes/EmDash/listSearch/getMenus';
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
@@ -1827,16 +1829,169 @@ describe('EmDash integration tests', () => {
 		});
 	});
 
+	describe('resource: settings', () => {
+		const operationProp = node.description.properties.find(
+			(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes('settings'),
+		);
+		const options = operationProp?.options as INodePropertyOptions[];
+		const getOperation = (val: string) => options?.find((o) => o.value === val);
+
+		it('registers get and update operations with correct HTTP methods and paths', () => {
+			expect(options).toHaveLength(2);
+
+			const getOp = getOperation('get');
+			expect(getOp, 'Operation get should exist').toBeDefined();
+			expect(getOp?.routing?.request?.method).toBe('GET');
+			expect(getOp?.routing?.request?.url).toBe('/settings');
+
+			const updateOp = getOperation('update');
+			expect(updateOp, 'Operation update should exist').toBeDefined();
+			expect(updateOp?.routing?.request?.method).toBe('PUT');
+			expect(updateOp?.routing?.request?.url).toBe('/settings');
+		});
+
+		it('unwraps data rootProperty for get and update operations', () => {
+			const getOp = getOperation('get');
+			expect(getOp?.routing?.output?.postReceive).toEqual([
+				{
+					type: 'rootProperty',
+					properties: {
+						property: 'data',
+					},
+				},
+			]);
+
+			const updateOp = getOperation('update');
+			expect(updateOp?.routing?.output?.postReceive).toEqual([
+				{
+					type: 'rootProperty',
+					properties: {
+						property: 'data',
+					},
+				},
+			]);
+		});
+
+		it('wires validateUpdateSettings preSend hook on update operation', () => {
+			const updateOp = getOperation('update');
+			expect(updateOp?.routing?.send?.preSend).toEqual([validateUpdateSettings]);
+		});
+
+		it('wires settings property with required flag and json type', () => {
+			const settingsProp = node.description.properties.find(
+				(p) =>
+					p.name === 'settings' &&
+					p.displayOptions?.show?.resource?.includes('settings') &&
+					p.displayOptions?.show?.operation?.includes('update'),
+			);
+			expect(settingsProp).toBeDefined();
+			expect(settingsProp?.type).toBe('json');
+			expect(settingsProp?.required).toBe(true);
+			expect(settingsProp?.default).toBe('{}');
+		});
+
+		describe('Settings Update validation', () => {
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) =>
+					params[name] !== undefined ? params[name] : fallback,
+			});
+
+			it('accepts valid object', () => {
+				const input = { title: 'My Blog', tagline: 'A blog' };
+				const validated = parseAndValidateSettings(input);
+				expect(validated).toEqual({ title: 'My Blog', tagline: 'A blog' });
+			});
+
+			it('accepts valid JSON string', () => {
+				const input = '{"title":"My Blog"}';
+				const validated = parseAndValidateSettings(input);
+				expect(validated).toEqual({ title: 'My Blog' });
+			});
+
+			it('accepts arbitrary custom settings fields', () => {
+				const input = { customKey: 123, nested: { enabled: true } };
+				const validated = parseAndValidateSettings(input);
+				expect(validated).toEqual({ customKey: 123, nested: { enabled: true } });
+			});
+
+			it('rejects null', () => {
+				expect(() => parseAndValidateSettings(null)).toThrow(/must be an object.*null/i);
+			});
+
+			it('rejects array', () => {
+				expect(() => parseAndValidateSettings([1, 2, 3])).toThrow(/must be an object.*array/i);
+				expect(() => parseAndValidateSettings('[1, 2, 3]')).toThrow(
+					/must evaluate to an object.*array/i,
+				);
+			});
+
+			it('rejects primitive values: number, boolean, string', () => {
+				expect(() => parseAndValidateSettings(42)).toThrow(/must be an object.*number/i);
+				expect(() => parseAndValidateSettings(true)).toThrow(/must be an object.*boolean/i);
+				expect(() => parseAndValidateSettings('just a string')).toThrow(
+					/Invalid JSON|must evaluate to an object/i,
+				);
+				expect(() => parseAndValidateSettings('"just a string"')).toThrow(
+					/must evaluate to an object.*string/i,
+				);
+			});
+
+			it('rejects empty string or malformed JSON string', () => {
+				expect(() => parseAndValidateSettings('')).toThrow(/cannot be empty/i);
+				expect(() => parseAndValidateSettings('   ')).toThrow(/cannot be empty/i);
+				expect(() => parseAndValidateSettings('{ bad json')).toThrow(/Invalid JSON for settings/i);
+			});
+
+			it('executes preSend hook and sets requestOptions.body to validated settings', async () => {
+				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				const settings = { title: 'My Blog', tagline: 'A blog' };
+				const result = await validateUpdateSettings.call(createMockContext({ settings }) as never, {
+					...req,
+				});
+				expect(result.body).toEqual(settings);
+			});
+
+			it('executes preSend hook with JSON string and sets requestOptions.body to parsed settings object', async () => {
+				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				const settings = '{"title":"Parsed Title","featureFlags":{"beta":true}}';
+				const result = await validateUpdateSettings.call(createMockContext({ settings }) as never, {
+					...req,
+				});
+				expect(result.body).toEqual({
+					title: 'Parsed Title',
+					featureFlags: { beta: true },
+				});
+			});
+
+			it('preSend hook rejects invalid settings input with informative error', async () => {
+				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				await expect(
+					validateUpdateSettings.call(createMockContext({ settings: null }) as never, { ...req }),
+				).rejects.toThrow(/must be an object/i);
+				await expect(
+					validateUpdateSettings.call(createMockContext({ settings: [1, 2] }) as never, { ...req }),
+				).rejects.toThrow(/must be an object/i);
+				await expect(
+					validateUpdateSettings.call(createMockContext({ settings: 'invalid' }) as never, {
+						...req,
+					}),
+				).rejects.toThrow(/Invalid JSON/i);
+			});
+		});
+	});
+
 	describe('resource and operation counts', () => {
-		it('registers Comment and Menu resources in resource options', () => {
+		it('registers Comment, Menu, and Settings resources in resource options', () => {
 			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
 			const options = resourceProp?.options as INodePropertyOptions[];
+			expect(options).toHaveLength(8);
 			expect(options.some((opt) => opt.value === 'comment' && opt.name === 'Comment')).toBe(true);
 			expect(options.some((opt) => opt.value === 'menu' && opt.name === 'Menu')).toBe(true);
+			expect(options.some((opt) => opt.value === 'settings' && opt.name === 'Settings')).toBe(true);
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing 57 operations and adds 9 menu operations for 66 total', () => {
+		it('preserves existing 66 operations and adds 2 settings operations for 68 total', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -1857,17 +2012,19 @@ describe('EmDash integration tests', () => {
 			expect(countsByResource['redirect']).toBe(9);
 			expect(countsByResource['comment']).toBe(6);
 			expect(countsByResource['menu']).toBe(9);
-			// Existing 6 resources sum to 57
+			expect(countsByResource['settings']).toBe(2);
+			// Existing 7 resources sum to 66
 			expect(
 				countsByResource['content'] +
 					countsByResource['media'] +
 					countsByResource['taxonomy'] +
 					countsByResource['search'] +
 					countsByResource['redirect'] +
-					countsByResource['comment'],
-			).toBe(57);
+					countsByResource['comment'] +
+					countsByResource['menu'],
+			).toBe(66);
 
-			expect(totalOperations).toBe(66);
+			expect(totalOperations).toBe(68);
 		});
 	});
 
