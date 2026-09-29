@@ -8,6 +8,11 @@ import {
 	unwrapEnvelope,
 	cursorPaginationOperations,
 	prepareMediaUpload,
+	prepareMediaReplacement,
+	prepareGetUploadTarget,
+	preparePendingMediaUpload,
+	prepareConfirmUpload,
+	validateMediaUpdate,
 	parseAndValidateCommentIds,
 	validateBulkCommentAction,
 	parseAndValidateReorderMenuItems,
@@ -507,6 +512,10 @@ describe('EmDash integration tests', () => {
 			{ name: 'update', method: 'PUT', url: '=/media/{{$parameter.mediaId}}' },
 			{ name: 'delete', method: 'DELETE', url: '=/media/{{$parameter.mediaId}}' },
 			{ name: 'getUsage', method: 'GET', url: '=/media/{{$parameter.mediaId}}/usage' },
+			{ name: 'replaceImage', method: 'PUT', url: '=/media/{{$parameter.mediaId}}/replace' },
+			{ name: 'getUploadTarget', method: 'POST', url: '/media/upload-url' },
+			{ name: 'uploadPending', method: 'PUT', url: '=/media/{{$parameter.mediaId}}/upload' },
+			{ name: 'confirmUpload', method: 'POST', url: '=/media/{{$parameter.mediaId}}/confirm' },
 		];
 
 		it('registers everyday media operations with correct HTTP methods and paths', () => {
@@ -529,30 +538,42 @@ describe('EmDash integration tests', () => {
 				},
 			]);
 
-			const get = getOperation('get');
-			expect(get?.routing?.output?.postReceive).toEqual([
-				{
-					type: 'rootProperty',
-					properties: {
-						property: 'data',
+			for (const opName of [
+				'get',
+				'upload',
+				'update',
+				'delete',
+				'getUsage',
+				'replaceImage',
+				'getUploadTarget',
+				'uploadPending',
+				'confirmUpload',
+			]) {
+				const op = getOperation(opName);
+				expect(op?.routing?.output?.postReceive).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: 'data',
+						},
 					},
-				},
-			]);
-
-			const upload = getOperation('upload');
-			expect(upload?.routing?.output?.postReceive).toEqual([
-				{
-					type: 'rootProperty',
-					properties: {
-						property: 'data',
-					},
-				},
-			]);
+				]);
+			}
 		});
 
-		it('configures upload operation with prepareMediaUpload preSend hook', () => {
-			const upload = getOperation('upload');
-			expect(upload?.routing?.send?.preSend).toEqual([prepareMediaUpload]);
+		it('configures media operations with corresponding preSend hooks', () => {
+			expect(getOperation('upload')?.routing?.send?.preSend).toEqual([prepareMediaUpload]);
+			expect(getOperation('replaceImage')?.routing?.send?.preSend).toEqual([
+				prepareMediaReplacement,
+			]);
+			expect(getOperation('getUploadTarget')?.routing?.send?.preSend).toEqual([
+				prepareGetUploadTarget,
+			]);
+			expect(getOperation('uploadPending')?.routing?.send?.preSend).toEqual([
+				preparePendingMediaUpload,
+			]);
+			expect(getOperation('confirmUpload')?.routing?.send?.preSend).toEqual([prepareConfirmUpload]);
+			expect(getOperation('update')?.routing?.send?.preSend).toEqual([validateMediaUpdate]);
 		});
 	});
 
@@ -655,6 +676,612 @@ describe('EmDash integration tests', () => {
 			const blob = formData.get('file') as Blob;
 			expect(blob).toBeDefined();
 			expect(blob.type).toBe('image/jpeg');
+		});
+	});
+
+	describe('direct media upload enhancements', () => {
+		it('appends fieldId, width, and height if supplied', async () => {
+			const fileBuffer = Buffer.from('test-binary-data');
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'binaryPropertyName') return 'data';
+					if (name === 'additionalFields') {
+						return {
+							fieldId: 'avatar',
+							width: 800,
+							height: 600,
+						};
+					}
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: () => ({ fileName: 'avatar.png', mimeType: 'image/png' }),
+					getBinaryDataBuffer: async () => fileBuffer,
+				},
+			};
+
+			const requestOptions = {
+				method: 'POST' as const,
+				url: 'https://example.com/_emdash/api/media',
+				headers: {},
+			};
+
+			const result = await prepareMediaUpload.call(mockContext as never, requestOptions);
+			const formData = result.body as FormData;
+			expect(formData.get('fieldId')).toBe('avatar');
+			expect(formData.get('width')).toBe('800');
+			expect(formData.get('height')).toBe('600');
+		});
+
+		it('appends thumbnail when thumbnailBinaryPropertyName is provided', async () => {
+			const fileBuffer = Buffer.from('main-image-data');
+			const thumbBuffer = Buffer.from('thumb-image-data');
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'binaryPropertyName') return 'data';
+					if (name === 'additionalFields') {
+						return {
+							thumbnailBinaryPropertyName: 'thumb',
+						};
+					}
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: (prop: string) => {
+						if (prop === 'thumb') return { fileName: 'thumb.jpg', mimeType: 'image/jpeg' };
+						return { fileName: 'photo.jpg', mimeType: 'image/jpeg' };
+					},
+					getBinaryDataBuffer: async (prop: string) => {
+						if (prop === 'thumb') return thumbBuffer;
+						return fileBuffer;
+					},
+				},
+			};
+
+			const requestOptions = {
+				method: 'POST' as const,
+				url: 'https://example.com/_emdash/api/media',
+				headers: {},
+			};
+
+			const result = await prepareMediaUpload.call(mockContext as never, requestOptions);
+			const formData = result.body as FormData;
+			const thumbBlob = formData.get('thumbnail') as Blob;
+			expect(thumbBlob).toBeDefined();
+			expect(thumbBlob.type).toBe('image/jpeg');
+		});
+
+		it('validates width and height when supplied to direct upload', async () => {
+			const mockContextInvalidWidth = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'additionalFields') return { width: 0 };
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: () => ({ fileName: 'test.jpg', mimeType: 'image/jpeg' }),
+					getBinaryDataBuffer: async () => Buffer.from('data'),
+				},
+			};
+			await expect(
+				prepareMediaUpload.call(mockContextInvalidWidth as never, {
+					method: 'POST',
+					url: '/media',
+				}),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			const mockContextInvalidHeight = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'additionalFields') return { height: -5 };
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: () => ({ fileName: 'test.jpg', mimeType: 'image/jpeg' }),
+					getBinaryDataBuffer: async () => Buffer.from('data'),
+				},
+			};
+			await expect(
+				prepareMediaUpload.call(mockContextInvalidHeight as never, {
+					method: 'POST',
+					url: '/media',
+				}),
+			).rejects.toThrow('Height must be an integer greater than 0');
+		});
+	});
+
+	describe('media replacement preSend hook implementation', () => {
+		it('builds multipart FormData with file, width, and height, deleting Content-Type header', async () => {
+			const fileBuffer = Buffer.from('replacement-binary-data');
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'width') return 1920;
+					if (name === 'height') return 1080;
+					if (name === 'binaryPropertyName') return 'data';
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: (prop: string) => {
+						expect(prop).toBe('data');
+						return { fileName: 'replaced.webp', mimeType: 'image/webp' };
+					},
+					getBinaryDataBuffer: async (prop: string) => {
+						expect(prop).toBe('data');
+						return fileBuffer;
+					},
+				},
+			};
+
+			const requestOptions = {
+				method: 'PUT' as const,
+				url: 'https://example.com/_emdash/api/media/med_123/replace',
+				headers: {
+					Accept: 'application/json',
+					'Content-Type': 'application/json',
+				},
+			};
+
+			const result = await prepareMediaReplacement.call(mockContext as never, requestOptions);
+			expect(result.headers?.['Content-Type']).toBeUndefined();
+			expect(result.headers?.['content-type']).toBeUndefined();
+			expect(result.body).toBeInstanceOf(FormData);
+
+			const formData = result.body as FormData;
+			expect(formData.get('width')).toBe('1920');
+			expect(formData.get('height')).toBe('1080');
+
+			const blob = formData.get('file') as Blob;
+			expect(blob).toBeDefined();
+			expect(blob.type).toBe('image/webp');
+		});
+
+		it('validates width and height are integers > 0', async () => {
+			const createMock = (width: unknown, height: unknown) => ({
+				getNodeParameter: (name: string) => {
+					if (name === 'width') return width;
+					if (name === 'height') return height;
+					return '';
+				},
+				helpers: {
+					assertBinaryData: () => ({}),
+					getBinaryDataBuffer: async () => Buffer.from(''),
+				},
+			});
+
+			await expect(
+				prepareMediaReplacement.call(createMock(0, 100) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			await expect(
+				prepareMediaReplacement.call(createMock(-10, 100) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			await expect(
+				prepareMediaReplacement.call(createMock(10.5, 100) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			await expect(
+				prepareMediaReplacement.call(createMock(100, 0) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Height must be an integer greater than 0');
+
+			await expect(
+				prepareMediaReplacement.call(createMock(100, -5) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Height must be an integer greater than 0');
+
+			await expect(
+				prepareMediaReplacement.call(createMock(100, 33.3) as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('Height must be an integer greater than 0');
+		});
+	});
+
+	describe('get upload target preSend hook implementation', () => {
+		it('builds JSON body with required and configured optional parameters', async () => {
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'filename') return 'sample.png';
+					if (name === 'contentType') return 'image/png';
+					if (name === 'size') return 1048576;
+					if (name === 'additionalFields') {
+						return {
+							contentHash: 'a1b2c3d4e5',
+							fieldId: 'featured_image',
+							deduplicate: true,
+							ensureUniqueFilename: true,
+							folderId: 'fld_xyz',
+						};
+					}
+					return fallback;
+				},
+			};
+
+			const requestOptions = {
+				method: 'POST' as const,
+				url: 'https://example.com/_emdash/api/media/upload-url',
+				headers: {},
+			};
+
+			const result = await prepareGetUploadTarget.call(mockContext as never, requestOptions);
+			expect(result.body).toEqual({
+				filename: 'sample.png',
+				contentType: 'image/png',
+				size: 1048576,
+				contentHash: 'a1b2c3d4e5',
+				fieldId: 'featured_image',
+				deduplicate: true,
+				ensureUniqueFilename: true,
+				folderId: 'fld_xyz',
+			});
+		});
+
+		it('transforms folderId unfiled, empty, or null to null in body', async () => {
+			const mockContextUnfiled = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'filename') return 'sample.png';
+					if (name === 'contentType') return 'image/png';
+					if (name === 'size') return 100;
+					if (name === 'additionalFields') return { folderId: 'unfiled' };
+					return fallback;
+				},
+			};
+
+			const result = await prepareGetUploadTarget.call(mockContextUnfiled as never, {
+				method: 'POST',
+				url: '',
+			});
+			expect((result.body as Record<string, unknown>).folderId).toBeNull();
+
+			const mockContextEmpty = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'filename') return 'sample.png';
+					if (name === 'contentType') return 'image/png';
+					if (name === 'size') return 100;
+					if (name === 'additionalFields') return { folderId: '  ' };
+					return fallback;
+				},
+			};
+
+			const resultEmpty = await prepareGetUploadTarget.call(mockContextEmpty as never, {
+				method: 'POST',
+				url: '',
+			});
+			expect((resultEmpty.body as Record<string, unknown>).folderId).toBeNull();
+		});
+
+		it('validates filename, contentType, and size', async () => {
+			const createMock = (filename: unknown, contentType: unknown, size: unknown) => ({
+				getNodeParameter: (name: string) => {
+					if (name === 'filename') return filename;
+					if (name === 'contentType') return contentType;
+					if (name === 'size') return size;
+					return {};
+				},
+			});
+
+			await expect(
+				prepareGetUploadTarget.call(createMock('', 'image/png', 100) as never, {
+					method: 'POST',
+					url: '',
+				}),
+			).rejects.toThrow('Filename is required');
+
+			await expect(
+				prepareGetUploadTarget.call(createMock('test.png', '', 100) as never, {
+					method: 'POST',
+					url: '',
+				}),
+			).rejects.toThrow('Content Type is required');
+
+			await expect(
+				prepareGetUploadTarget.call(createMock('test.png', 'image/png', -1) as never, {
+					method: 'POST',
+					url: '',
+				}),
+			).rejects.toThrow('Size must be an integer greater than or equal to 0');
+
+			await expect(
+				prepareGetUploadTarget.call(createMock('test.png', 'image/png', 12.5) as never, {
+					method: 'POST',
+					url: '',
+				}),
+			).rejects.toThrow('Size must be an integer greater than or equal to 0');
+		});
+
+		it('unwraps union response for upload target and deduplication short-circuit', () => {
+			const targetResponse = {
+				success: true,
+				data: {
+					mediaId: 'med_staged123',
+					uploadUrl: 'https://s3.example.com/bucket/key',
+					method: 'PUT',
+				},
+			};
+			const unwrappedTarget = unwrapEnvelope(targetResponse);
+			expect(unwrappedTarget).toEqual({
+				mediaId: 'med_staged123',
+				uploadUrl: 'https://s3.example.com/bucket/key',
+				method: 'PUT',
+			});
+
+			const dedupResponse = {
+				success: true,
+				data: {
+					item: {
+						id: 'med_existing456',
+						filename: 'photo.jpg',
+						mimeType: 'image/jpeg',
+					},
+					deduplicated: true,
+				},
+			};
+			const unwrappedDedup = unwrapEnvelope(dedupResponse);
+			expect(unwrappedDedup).toEqual({
+				item: {
+					id: 'med_existing456',
+					filename: 'photo.jpg',
+					mimeType: 'image/jpeg',
+				},
+				deduplicated: true,
+			});
+		});
+	});
+
+	describe('upload pending media preSend hook implementation', () => {
+		it('streams raw binary body with Content-Type and Content-Length headers', async () => {
+			const fileBuffer = Buffer.from('raw-pending-binary-stream-data');
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'binaryPropertyName') return 'data';
+					return fallback;
+				},
+				helpers: {
+					assertBinaryData: () => ({
+						fileName: 'document.pdf',
+						mimeType: 'application/pdf',
+					}),
+					getBinaryDataBuffer: async () => fileBuffer,
+				},
+			};
+
+			const requestOptions = {
+				method: 'PUT' as const,
+				url: 'https://example.com/_emdash/api/media/med_123/upload',
+				headers: {
+					Accept: 'application/json',
+				},
+			};
+
+			const result = await preparePendingMediaUpload.call(mockContext as never, requestOptions);
+			expect(result.body).toBe(fileBuffer);
+			expect(result.body).toBeInstanceOf(Buffer);
+			expect(result.headers?.['Content-Type']).toBe('application/pdf');
+			expect(result.headers?.['Content-Length']).toBe(String(fileBuffer.length));
+		});
+
+		it('falls back to application/octet-stream if mimeType is undefined', async () => {
+			const fileBuffer = Buffer.from('octet-data');
+			const mockContext = {
+				getNodeParameter: () => 'data',
+				helpers: {
+					assertBinaryData: () => ({}),
+					getBinaryDataBuffer: async () => fileBuffer,
+				},
+			};
+
+			const result = await preparePendingMediaUpload.call(mockContext as never, {
+				method: 'PUT',
+				url: '',
+				headers: {},
+			});
+			expect(result.headers?.['Content-Type']).toBe('application/octet-stream');
+			expect(result.headers?.['Content-Length']).toBe(String(fileBuffer.length));
+		});
+	});
+
+	describe('confirm upload preSend hook implementation', () => {
+		it('sends empty JSON body when no additional fields are configured', async () => {
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'additionalFields') return {};
+					return fallback;
+				},
+			};
+
+			const result = await prepareConfirmUpload.call(mockContext as never, {
+				method: 'POST',
+				url: '',
+			});
+			expect(result.body).toEqual({});
+		});
+
+		it('validates optional size, width, and height when supplied', async () => {
+			const mockContext = {
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name === 'additionalFields') {
+						return {
+							size: 2048,
+							width: 1200,
+							height: 800,
+						};
+					}
+					return fallback;
+				},
+			};
+
+			const result = await prepareConfirmUpload.call(mockContext as never, {
+				method: 'POST',
+				url: '',
+			});
+			expect(result.body).toEqual({
+				size: 2048,
+				width: 1200,
+				height: 800,
+			});
+
+			// Rejects invalid size
+			await expect(
+				prepareConfirmUpload.call(
+					{ getNodeParameter: () => ({ additionalFields: { size: -1 } }) } as never,
+					{ method: 'POST', url: '' },
+				),
+			).rejects.toThrow('Size must be an integer greater than or equal to 0');
+
+			// Rejects invalid width
+			await expect(
+				prepareConfirmUpload.call(
+					{ getNodeParameter: () => ({ additionalFields: { width: 0 } }) } as never,
+					{ method: 'POST', url: '' },
+				),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			// Rejects invalid height
+			await expect(
+				prepareConfirmUpload.call(
+					{ getNodeParameter: () => ({ additionalFields: { height: -10 } }) } as never,
+					{ method: 'POST', url: '' },
+				),
+			).rejects.toThrow('Height must be an integer greater than 0');
+		});
+	});
+
+	describe('media getUsage pagination and envelope preservation', () => {
+		it('preserves full usage response with coverage and siteSettings without auto-pagination', () => {
+			const usageResponse = {
+				success: true,
+				data: {
+					items: [
+						{
+							contentId: 'cnt_123',
+							collection: 'posts',
+							title: 'Sample Post',
+							fields: ['featuredImage'],
+						},
+					],
+					nextCursor: 'cur_abc123',
+					siteSettings: {
+						logo: true,
+					},
+					coverage: {
+						totalReferencingItems: 1,
+						inspectedCollections: ['posts', 'pages'],
+					},
+				},
+			};
+
+			const unwrapped = unwrapEnvelope(usageResponse);
+			expect(unwrapped).toEqual(usageResponse.data);
+			expect(unwrapped).toHaveProperty('items');
+			expect(unwrapped).toHaveProperty('nextCursor', 'cur_abc123');
+			expect(unwrapped).toHaveProperty('siteSettings');
+			expect(unwrapped).toHaveProperty('coverage');
+		});
+	});
+
+	describe('validateMediaUpdate preSend hook implementation', () => {
+		it('rejects empty update when no update fields are configured', async () => {
+			const mockContext = {
+				getNodeParameter: () => ({}),
+			};
+			await expect(
+				validateMediaUpdate.call(mockContext as never, { method: 'PUT', url: '' }),
+			).rejects.toThrow('At least one media property must be provided for update');
+		});
+
+		it('validates width and height are integers > 0', async () => {
+			await expect(
+				validateMediaUpdate.call({ getNodeParameter: () => ({ width: 0 }) } as never, {
+					method: 'PUT',
+					url: '',
+				}),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			await expect(
+				validateMediaUpdate.call({ getNodeParameter: () => ({ width: 12.5 }) } as never, {
+					method: 'PUT',
+					url: '',
+				}),
+			).rejects.toThrow('Width must be an integer greater than 0');
+
+			await expect(
+				validateMediaUpdate.call({ getNodeParameter: () => ({ height: -1 }) } as never, {
+					method: 'PUT',
+					url: '',
+				}),
+			).rejects.toThrow('Height must be an integer greater than 0');
+		});
+
+		it('validates focalX and focalY pairs', async () => {
+			await expect(
+				validateMediaUpdate.call({ getNodeParameter: () => ({ focalX: 0.5 }) } as never, {
+					method: 'PUT',
+					url: '',
+				}),
+			).rejects.toThrow(
+				'Both focalX and focalY must be provided together (numbers between 0 and 1, or both null to clear)',
+			);
+
+			await expect(
+				validateMediaUpdate.call({ getNodeParameter: () => ({ focalY: 0.5 }) } as never, {
+					method: 'PUT',
+					url: '',
+				}),
+			).rejects.toThrow(
+				'Both focalX and focalY must be provided together (numbers between 0 and 1, or both null to clear)',
+			);
+
+			await expect(
+				validateMediaUpdate.call(
+					{ getNodeParameter: () => ({ focalX: 1.5, focalY: 0.5 }) } as never,
+					{ method: 'PUT', url: '' },
+				),
+			).rejects.toThrow(
+				'Both focalX and focalY must be provided together (numbers between 0 and 1, or both null to clear)',
+			);
+
+			const validPairsResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ focalX: 0.25, focalY: 0.75 }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(validPairsResult.body).toEqual({ focalX: 0.25, focalY: 0.75 });
+		});
+
+		it('supports clearing focal point via clearFocalPoint or null values', async () => {
+			const clearResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ clearFocalPoint: true }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(clearResult.body).toEqual({ focalX: null, focalY: null });
+
+			const nullsResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ focalX: null, focalY: null }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(nullsResult.body).toEqual({ focalX: null, focalY: null });
+		});
+
+		it('handles folderId unfiled or string', async () => {
+			const unfiledResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ folderId: 'unfiled' }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(unfiledResult.body).toEqual({ folderId: null });
+
+			const emptyResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ folderId: '' }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(emptyResult.body).toEqual({ folderId: null });
+
+			const folderResult = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ folderId: 'fld_abc' }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(folderResult.body).toEqual({ folderId: 'fld_abc' });
+		});
+
+		it('passes alt and caption', async () => {
+			const result = await validateMediaUpdate.call(
+				{ getNodeParameter: () => ({ alt: 'A sunset', caption: 'Beautiful sky' }) } as never,
+				{ method: 'PUT', url: '' },
+			);
+			expect(result.body).toEqual({ alt: 'A sunset', caption: 'Beautiful sky' });
 		});
 	});
 
@@ -3097,7 +3724,7 @@ describe('EmDash integration tests', () => {
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing operations and registers 87 total across 10 resources with 22 content operations', () => {
+		it('preserves existing operations and registers 91 total across 10 resources with 22 content operations', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -3112,7 +3739,7 @@ describe('EmDash integration tests', () => {
 			}
 
 			expect(countsByResource['content']).toBe(22);
-			expect(countsByResource['media']).toBe(11);
+			expect(countsByResource['media']).toBe(15);
 			expect(countsByResource['taxonomy']).toBe(10);
 			expect(countsByResource['search']).toBe(5);
 			expect(countsByResource['redirect']).toBe(9);
@@ -3131,9 +3758,9 @@ describe('EmDash integration tests', () => {
 					countsByResource['comment'] +
 					countsByResource['menu'] +
 					countsByResource['settings'],
-			).toBe(74);
+			).toBe(78);
 
-			expect(totalOperations).toBe(87);
+			expect(totalOperations).toBe(91);
 		});
 	});
 

@@ -154,6 +154,42 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Media Replace Image: requires mediaId, binaryPropertyName, width, height
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'replaceImage',
+				requiredControls: ['mediaId', 'binaryPropertyName', 'width', 'height'],
+			}),
+		).not.toThrow();
+
+		// Media Get Upload Target: requires filename, contentType, size
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'getUploadTarget',
+				requiredControls: ['filename', 'contentType', 'size'],
+			}),
+		).not.toThrow();
+
+		// Media Upload Pending: requires mediaId, binaryPropertyName
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'uploadPending',
+				requiredControls: ['mediaId', 'binaryPropertyName'],
+			}),
+		).not.toThrow();
+
+		// Media Confirm Upload: requires mediaId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'media',
+				operation: 'confirmUpload',
+				requiredControls: ['mediaId'],
+			}),
+		).not.toThrow();
+
 		// Media Folder Get: requires folderId
 		expect(() =>
 			assertRequiredControls(description, {
@@ -625,6 +661,16 @@ describe('EmDash node operation contracts', () => {
 
 		const mediaId = description.properties.find(({ name }) => name === 'mediaId');
 		expect(mediaId?.required).toBe(true);
+		expect(mediaId?.displayOptions?.show?.resource).toEqual(['media']);
+		expect(mediaId?.displayOptions?.show?.operation).toEqual([
+			'get',
+			'update',
+			'delete',
+			'getUsage',
+			'replaceImage',
+			'uploadPending',
+			'confirmUpload',
+		]);
 
 		const folderId = description.properties.find(({ name }) => name === 'folderId');
 		expect(folderId?.required).toBe(true);

@@ -94,7 +94,8 @@ export const mediaGetManyDescription: INodeProperties[] = [
 				name: 'includeUsage',
 				type: 'boolean',
 				default: false,
-				description: 'Whether to include content item usage reference details',
+				description:
+					'Whether to include a coverage-aware usage summary on each media item. Note: usage.count is null unless caller holds admin token scope; for full usage details use Get Usage.',
 				routing: {
 					request: {
 						qs: {
@@ -122,7 +123,7 @@ export const mediaGetManyDescription: INodeProperties[] = [
 				name: 'q',
 				type: 'string',
 				default: '',
-				description: 'Search across filename, title, alt text, and caption',
+				description: 'Case-insensitive filename substring search (also matches extensions)',
 				routing: {
 					request: {
 						qs: {

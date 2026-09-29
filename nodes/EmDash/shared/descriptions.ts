@@ -75,7 +75,15 @@ export const mediaIdProperty: INodeProperties = {
 	displayOptions: {
 		show: {
 			resource: ['media'],
-			operation: ['get', 'update', 'delete', 'getUsage'],
+			operation: [
+				'get',
+				'update',
+				'delete',
+				'getUsage',
+				'replaceImage',
+				'uploadPending',
+				'confirmUpload',
+			],
 		},
 	},
 	description: 'The ID of the media item',
