@@ -1,6 +1,6 @@
 # n8n-nodes-emdash
 
-Consume and manage content, media, menus, taxonomies, search, URL redirects, comments, and settings from EmDash CMS in n8n workflows.
+Consume and manage content, media, menus, taxonomies, search, URL redirects, comments, settings, sections, and widget areas from EmDash CMS in n8n workflows.
 
 > This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
@@ -53,6 +53,12 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Settings operations**:
   - **PAT scopes**: Read queries (`GET`) require `settings:read` (or `admin`). Update operations (`POST`) require `settings:manage` (or `admin`).
   - **RBAC permissions**: The authenticated user must separately possess the `settings:read` capability for reads, and `settings:manage` capability (Administrator role) for updates.
+- **Section operations**:
+  - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `sections:*` PAT scopes.
+  - **RBAC permissions**: The authenticated user must separately possess the `sections:read` capability for reads, and `sections:manage` capability (Editor or Administrator role) for mutations.
+- **Widget Area operations**:
+  - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `widgets:*` PAT scopes.
+  - **RBAC permissions**: The authenticated user must separately possess the `widgets:read` capability for reads, and `widgets:manage` capability (Editor or Administrator role) for mutations.
 
 ### EmDash Webhook Credential
 
@@ -63,7 +69,7 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 68 operations across 8 core resources:
+The EmDash community node provides 81 operations across 10 core resources:
 
 ### Comment (6 operations)
 
@@ -119,6 +125,39 @@ The EmDash community node provides 68 operations across 8 core resources:
 - **Delete Item** (`deleteItem`): Remove a navigation item from a menu (does not delete referenced content).
 - **Reorder Items** (`reorderItems`): Atomically update menu hierarchy and sibling ordering via an array of item IDs, parent references, and sort positions.
 
+### Redirect (9 operations)
+
+- **Get Many** (`getAllRedirects`): List URL redirect rules with cursor pagination and search, group, enabled, auto filters.
+- **Get** (`getRedirect`): Retrieve redirect rule by ID.
+- **Create** (`createRedirect`): Create a redirect rule (`301`, `302`, `307`, `308`, `410`, `451`).
+- **Update** (`updateRedirect`): Update redirect rule source, destination, status code, enabled state, or group.
+- **Delete** (`deleteRedirect`): Delete a redirect rule by ID.
+- **Get 404 Entries** (`get404Entries`): Retrieve recorded 404 Not Found error entries with cursor pagination and search filter.
+- **Get 404 Summary** (`get404Summary`): Retrieve aggregation summary of top 404 error paths.
+- **Prune 404 Log** (`prune404Log`): Delete 404 error log entries older than an ISO 8601 datetime threshold.
+- **Clear All 404 Entries** (`clear404Log`): Destructively delete all recorded 404 log entries.
+
+### Search (5 operations)
+
+- **Search** (`search`): Full-text search across indexed content with cursor pagination, collections filter, locale, status, and scope (`all` or `title`).
+- **Suggest** (`suggest`): Autocompletion prefix suggestions with collection and locale filters.
+- **Get Stats** (`getStats`): Retrieve search index statistics and document counts.
+- **Rebuild Index** (`rebuildIndex`): Trigger a search index rebuild for a specific collection.
+- **Enable / Configure Search** (`enableSearch`): Configure SQLite FTS5 search indexing for a collection, including tokenizer strategies (`porter unicode61`, `unicode61`, `trigram`) and column weight mapping.
+
+### Section (5 operations)
+
+- **Get Many** (`getAll`): Retrieve sections with cursor pagination and optional source (`theme`, `user`, `import`) or search filters.
+- **Get** (`get`): Retrieve a single section by slug.
+- **Create** (`create`): Create a new section with slug, title, structured JSON content, and optional description, keywords, preview media ID, source (`user` or `import`), or theme ID.
+- **Update** (`update`): Update section slug, title, description, keywords, structured JSON content, or preview media ID (pass null or empty string to clear preview media).
+- **Delete** (`delete`): Delete a custom or imported section (theme-defined sections are protected and cannot be deleted).
+
+### Settings (2 operations)
+
+- **Get** (`get`): Retrieve current site settings object directly from the CMS without static schema constraints.
+- **Update** (`update`): Update site settings with a validated JSON object or expression via `POST /settings` (merges updates with existing settings; unspecified settings remain unchanged).
+
 ### Taxonomy (10 operations)
 
 - **Get Many** (`getAllTaxonomies`): List all registered taxonomies.
@@ -132,30 +171,16 @@ The EmDash community node provides 68 operations across 8 core resources:
 - **Delete Term** (`deleteTerm`): Delete a term from a taxonomy.
 - **Reorder Terms** (`reorderTerms`): Update display ordering of taxonomy terms (`POST /taxonomies/{name}/reorder`).
 
-### Search (5 operations)
+### Widget Area (8 operations)
 
-- **Search** (`search`): Full-text search across indexed content with cursor pagination, collections filter, locale, status, and scope (`all` or `title`).
-- **Suggest** (`suggest`): Autocompletion prefix suggestions with collection and locale filters.
-- **Get Stats** (`getStats`): Retrieve search index statistics and document counts.
-- **Rebuild Index** (`rebuildIndex`): Trigger a search index rebuild for a specific collection.
-- **Enable / Configure Search** (`enableSearch`): Configure SQLite FTS5 search indexing for a collection, including tokenizer strategies (`porter unicode61`, `unicode61`, `trigram`) and column weight mapping.
-
-### Redirect (9 operations)
-
-- **Get Many** (`getAllRedirects`): List URL redirect rules with cursor pagination and search, group, enabled, auto filters.
-- **Get** (`getRedirect`): Retrieve redirect rule by ID.
-- **Create** (`createRedirect`): Create a redirect rule (`301`, `302`, `307`, `308`, `410`, `451`).
-- **Update** (`updateRedirect`): Update redirect rule source, destination, status code, enabled state, or group.
-- **Delete** (`deleteRedirect`): Delete a redirect rule by ID.
-- **Get 404 Entries** (`get404Entries`): Retrieve recorded 404 Not Found error entries with cursor pagination and search filter.
-- **Get 404 Summary** (`get404Summary`): Retrieve aggregation summary of top 404 error paths.
-- **Prune 404 Log** (`prune404Log`): Delete 404 error log entries older than an ISO 8601 datetime threshold.
-- **Clear All 404 Entries** (`clear404Log`): Destructively delete all recorded 404 log entries.
-
-### Settings (2 operations)
-
-- **Get** (`get`): Retrieve current site settings object directly from the CMS without static schema constraints.
-- **Update** (`update`): Update site settings with a validated JSON object or expression via `POST /settings` (merges updates with existing settings; unspecified settings remain unchanged).
+- **Get Many** (`getAll`): Retrieve all registered widget areas with their widgets.
+- **Get** (`get`): Retrieve a widget area by name including its ordered widgets.
+- **Create** (`create`): Register a new custom widget area with name, label, and optional description.
+- **Delete** (`delete`): Delete a widget area (cascades deletion to all contained widgets).
+- **Create Widget** (`createWidget`): Add a widget (`content` with structured content blocks, `menu` with menu name, or `component` with component ID and JSON properties) to a widget area.
+- **Update Widget** (`updateWidget`): Update widget type, title, content blocks, menu name, component ID, or component properties.
+- **Delete Widget** (`deleteWidget`): Remove a widget from a widget area (does not delete referenced content, menus, or components).
+- **Reorder Widgets** (`reorderWidgets`): Update display ordering of widgets in an area using an ordered array of widget IDs.
 
 ## Trigger
 
@@ -169,6 +194,55 @@ The trigger supports the 4 official events emitted by the EmDash Webhook Notifie
 - **Content Updated** (`content:update`): Fired when an existing content entry is modified or saved.
 - **Content Deleted** (`content:delete`): Fired when an entry is moved to Trash or permanently deleted; the current notifier does not distinguish between the two.
 - **Media Uploaded** (`media:upload`): Fired when a media file is uploaded to the media library.
+
+### Event Payload Structure
+
+Webhooks deliver a JSON object envelope containing the following fields:
+
+- `event` (string, required): One of `content:create`, `content:update`, `content:delete`, `media:upload`.
+- `timestamp` (string, required): ISO 8601 UTC timestamp of event dispatch.
+- `resourceId` (string, required): Unique identifier of the created, mutated, or deleted resource.
+- `resourceType` (string, required): Resource category (`content` for content events, `media` for media events).
+- `collection` (string, required for content events): Target collection slug (e.g. `posts`, `pages`).
+- `data` (object, optional): Resource data payload. Inclusion is controlled by the EmDash notifier plugin setting `Include Content Data`. When enabled for content events, `data` contains the collection's custom content fields (`event.content.data`); system fields like `slug`, `status`, and `draftRevisionId` reside in `metadata`. When enabled for media upload events, `data` contains media metadata (`filename`, `mimeType`, `size`). When disabled, this field is omitted.
+- `metadata` (object, optional): System metadata about the event. For content events, contains `{ slug, status, draftRevisionId }`.
+
+Example content payload:
+
+```json
+{
+	"event": "content:create",
+	"timestamp": "2026-09-28T20:00:00.000Z",
+	"resourceId": "post_clx00123abc",
+	"resourceType": "content",
+	"collection": "posts",
+	"data": {
+		"title": "Announcing Product Launch",
+		"summary": "We are excited to share our latest release."
+	},
+	"metadata": {
+		"slug": "announcing-product-launch",
+		"status": "draft",
+		"draftRevisionId": "rev_01jk45mno"
+	}
+}
+```
+
+Example media payload:
+
+```json
+{
+	"event": "media:upload",
+	"timestamp": "2026-09-28T20:01:00.000Z",
+	"resourceId": "med_clx00456def",
+	"resourceType": "media",
+	"data": {
+		"filename": "hero-banner.jpg",
+		"mimeType": "image/jpeg",
+		"size": 245120
+	}
+}
+```
 
 ### Setup Guide
 
@@ -264,6 +338,36 @@ The Settings resource provides direct access to site-wide configuration stored i
 - **Authentication and permissions**:
   - **Personal Access Token (PAT) Scopes**: Reading settings via `Get` requires `settings:read` (or `admin`). Modifying settings via `Update` requires `settings:manage` (or `admin`).
   - **RBAC Capabilities**: The authenticated user account must possess the corresponding internal RBAC permission (`settings:read` capability for reads; `settings:manage` capability, typical of the Administrator role, for updates).
+
+### Section Management
+
+The Section resource provides full lifecycle management of reusable template and layout sections within EmDash CMS:
+
+- **Structured Content Blocks**: Section content is structured JSON representing component and layout blocks (such as block definitions, settings, and nested layouts). The node validates content via `validateStructuredContent` before dispatch to ensure a valid JSON object or array structure.
+- **Source Constraints and Protection**: Sections can be created with source `user` or `import`. EmDash strictly rejects creating sections with `source: "theme"` (HTTP 400 Bad Request), as theme sections are defined in codebase templates. Furthermore, theme-defined sections are protected and cannot be deleted via the API (EmDash returns HTTP 403 Forbidden).
+- **Preview Media Semantics**: The optional `previewMediaId` links a media library asset to the section to provide visual thumbnails in page and layout builders. In **Update Section**, passing an explicit `null` (or empty value) clears the existing preview media association.
+- **Authentication and Permissions**:
+  - **PAT Scopes**: Section reads (`GET`) require `content:read`. Section mutations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `sections:*` PAT scopes.
+  - **RBAC Capabilities**: The authenticated user must separately possess the `sections:read` role capability for reads, and `sections:manage` capability (Editor or Administrator) for mutations.
+- **Webhooks**: The `@emdash-cms/plugin-webhook-notifier` plugin does not emit webhook events for section modifications. Workflows managing sections should be scheduled or triggered downstream of content workflows.
+
+### Widget Area and Widget Configuration
+
+The Widget Area resource manages theme-registered and custom widget zones and the widgets placed inside them:
+
+- **Widget Types**: Widgets support three distinct types:
+  - `content`: Renders structured content blocks configured via the `content` JSON array.
+  - `menu`: Renders an existing navigation menu specified by `menuName`.
+  - `component`: Renders a site or theme component specified by `componentId`, with customizable options in `componentProps` JSON object.
+- **Cascade Deletion**: Deleting a widget area (`DELETE /widget-areas/{name}`) permanently cascades deletion to all contained widgets in the database.
+- **Widget Deletion Scope**: Deleting an individual widget (`DELETE /widget-areas/{name}/widgets/{id}`) removes the widget from the area without deleting the parent widget area, and without deleting referenced menus, components, or content items.
+- **Widget Reordering**: The `reorderWidgets` operation accepts an ordered array of widget IDs (`widgetIds`), updating the display sequence of widgets within the area.
+- **Timestamp Conventions**: Upstream EmDash `widgetAreaSchema` returns snake_case timestamps (`created_at` and `updated_at`), differing from the camelCase conventions used by content and comments.
+- **Update Safety**: Upstream EmDash requires at least one field to update on `PUT /widget-areas/{name}/widgets/{id}`; omitting all update fields returns HTTP 400 ("No fields to update"). The node validates this preSend to avoid unnecessary network roundtrips.
+- **Pagination**: The `GET /widget-areas` endpoint returns all registered widget areas in `{ items: [...] }` without cursor pagination.
+- **Authentication and Permissions**:
+  - **PAT Scopes**: Widget area reads (`GET`) require `content:read`. Widget area and widget mutations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `widgets:*` PAT scopes.
+  - **RBAC Capabilities**: The authenticated user must separately possess the `widgets:read` role capability for reads, and `widgets:manage` capability (Editor or Administrator) for mutations.
 
 ## Troubleshooting
 

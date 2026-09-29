@@ -14,8 +14,20 @@ import {
 	validateReorderMenuItems,
 	parseAndValidateSettings,
 	validateUpdateSettings,
+	validateCreateSection,
+	validateUpdateSection,
+	validateCreateWidgetArea,
+	validateCreateWidget,
+	validateUpdateWidget,
+	validateReorderWidgets,
+	validateStructuredContent,
+	validateJsonObject,
+	validateStringArray,
+	validateReorderWidgetIds,
 } from '../nodes/EmDash/shared/transport';
 import { getMenus } from '../nodes/EmDash/listSearch/getMenus';
+import { getSections } from '../nodes/EmDash/listSearch/getSections';
+import { getWidgetAreas } from '../nodes/EmDash/listSearch/getWidgetAreas';
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
 describe('EmDash integration tests', () => {
@@ -1990,18 +2002,721 @@ describe('EmDash integration tests', () => {
 		});
 	});
 
+	describe('section operations routing', () => {
+		const sectionOperations = node.description.properties.find(
+			(p) =>
+				p.name === 'operation' &&
+				(p.displayOptions?.show?.resource as string[])?.includes('section'),
+		);
+		const options = (sectionOperations?.options || []) as INodePropertyOptions[];
+
+		it('registers Section operation property with default getAll', () => {
+			expect(sectionOperations).toBeDefined();
+			expect(sectionOperations?.default).toBe('getAll');
+			expect(options).toHaveLength(5);
+		});
+
+		it('registers all 5 section operations with correct HTTP methods and paths', () => {
+			const expected: Record<string, { method: string; url: string }> = {
+				create: { method: 'POST', url: '/sections' },
+				delete: { method: 'DELETE', url: '=/sections/{{$parameter.section}}' },
+				get: { method: 'GET', url: '=/sections/{{$parameter.section}}' },
+				getAll: { method: 'GET', url: '/sections' },
+				update: { method: 'PUT', url: '=/sections/{{$parameter.section}}' },
+			};
+
+			for (const [operation, { method, url }] of Object.entries(expected)) {
+				const option = options.find((opt) => opt.value === operation);
+				expect(option, `Missing operation ${operation}`).toBeDefined();
+				expect(option?.routing?.request?.method).toBe(method);
+				expect(option?.routing?.request?.url).toBe(url);
+			}
+		});
+
+		it('unwraps data.items for getAll and data for other section operations', () => {
+			const getAll = options.find((opt) => opt.value === 'getAll');
+			expect(getAll?.routing?.output?.postReceive).toEqual([
+				{
+					type: 'rootProperty',
+					properties: {
+						property: 'data.items',
+					},
+				},
+			]);
+
+			for (const op of ['create', 'delete', 'get', 'update']) {
+				const option = options.find((opt) => opt.value === op);
+				expect(option?.routing?.output?.postReceive).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: 'data',
+						},
+					},
+				]);
+			}
+		});
+
+		it('configures cursor pagination and returnAll logic for section getAll', () => {
+			const returnAll = node.description.properties.find(
+				(p) =>
+					p.name === 'returnAll' &&
+					(p.displayOptions?.show?.resource as string[])?.includes('section'),
+			);
+			expect(returnAll).toBeDefined();
+			expect(returnAll?.default).toBe(false);
+			expect(returnAll?.routing?.operations).toEqual(cursorPaginationOperations);
+
+			const limit = node.description.properties.find(
+				(p) =>
+					p.name === 'limit' && (p.displayOptions?.show?.resource as string[])?.includes('section'),
+			);
+			expect(limit).toBeDefined();
+			expect(limit?.default).toBe(50);
+		});
+
+		it('wires sectionSelect with required flag for get, update, delete', () => {
+			const section = node.description.properties.find((p) => p.name === 'section');
+			expect(section).toBeDefined();
+			expect(section?.required).toBe(true);
+			expect(section?.displayOptions?.show?.resource).toEqual(['section']);
+			expect(section?.displayOptions?.show?.operation).toEqual(['get', 'update', 'delete']);
+		});
+
+		it('provides clear warning on section delete', () => {
+			const deleteOption = options.find((opt) => opt.value === 'delete');
+			expect(deleteOption?.description).toContain('cannot delete theme sections');
+			expect(deleteOption?.description).toContain('does not delete referenced content/media');
+		});
+	});
+
+	describe('section validation and preSend', () => {
+		const createMockContext = (params: Record<string, unknown>) => ({
+			getNodeParameter: (name: string, fallback?: unknown) =>
+				params[name] !== undefined ? params[name] : fallback,
+		});
+
+		describe('validateStructuredContent', () => {
+			it('accepts valid array of objects', () => {
+				const content = [{ type: 'hero', heading: 'Hello' }];
+				expect(validateStructuredContent(content)).toEqual(content);
+			});
+
+			it('accepts valid JSON array string of objects', () => {
+				const content = '[{"type":"hero","heading":"Hello"}]';
+				expect(validateStructuredContent(content)).toEqual([{ type: 'hero', heading: 'Hello' }]);
+			});
+
+			it('accepts empty array', () => {
+				expect(validateStructuredContent([])).toEqual([]);
+				expect(validateStructuredContent('[]')).toEqual([]);
+			});
+
+			it('rejects null, undefined, and empty string', () => {
+				expect(() => validateStructuredContent(null)).toThrow(/required and must be an array/i);
+				expect(() => validateStructuredContent(undefined)).toThrow(
+					/required and must be an array/i,
+				);
+				expect(() => validateStructuredContent('')).toThrow(/required and must be an array/i);
+			});
+
+			it('rejects JSON that is not an array', () => {
+				expect(() => validateStructuredContent('{"type":"hero"}')).toThrow(
+					/must evaluate to an array/i,
+				);
+			});
+
+			it('rejects arrays containing primitive or null elements', () => {
+				expect(() => validateStructuredContent([123])).toThrow(/must be an object/i);
+				expect(() => validateStructuredContent(['hero'])).toThrow(/must be an object/i);
+				expect(() => validateStructuredContent([null])).toThrow(/must be an object/i);
+				expect(() => validateStructuredContent([true])).toThrow(/must be an object/i);
+				expect(() => validateStructuredContent([[{}], [{}]])).toThrow(/must be an object/i);
+			});
+		});
+
+		describe('validateStringArray', () => {
+			it('accepts string array', () => {
+				expect(validateStringArray(['tag1', 'tag2'])).toEqual(['tag1', 'tag2']);
+			});
+
+			it('accepts comma-separated string', () => {
+				expect(validateStringArray('tag1, tag2, tag3')).toEqual(['tag1', 'tag2', 'tag3']);
+			});
+
+			it('accepts JSON array string', () => {
+				expect(validateStringArray('["tag1", "tag2"]')).toEqual(['tag1', 'tag2']);
+			});
+
+			it('returns empty array for empty inputs', () => {
+				expect(validateStringArray(null)).toEqual([]);
+				expect(validateStringArray(undefined)).toEqual([]);
+				expect(validateStringArray('')).toEqual([]);
+			});
+
+			it('rejects non-string array members', () => {
+				expect(() => validateStringArray([123])).toThrow(/must be a string/i);
+			});
+		});
+
+		describe('validateCreateSection preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+
+			it('populates valid section body with required and additional fields', async () => {
+				const ctx = createMockContext({
+					slug: 'hero-banner',
+					title: 'Hero Banner',
+					content: [{ type: 'heading', text: 'Welcome' }],
+					additionalFields: {
+						description: 'A hero banner section',
+						keywords: 'hero, banner',
+						previewMediaId: 'med_123',
+						source: 'user',
+						themeId: 'theme_456',
+					},
+				});
+
+				const result = await validateCreateSection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					slug: 'hero-banner',
+					title: 'Hero Banner',
+					content: [{ type: 'heading', text: 'Welcome' }],
+					description: 'A hero banner section',
+					keywords: ['hero', 'banner'],
+					previewMediaId: 'med_123',
+					source: 'user',
+					themeId: 'theme_456',
+				});
+			});
+
+			it('rejects invalid slug format', async () => {
+				const ctx = createMockContext({
+					slug: 'Hero Banner!',
+					title: 'Hero Banner',
+					content: [{ type: 'heading' }],
+				});
+
+				await expect(validateCreateSection.call(ctx as never, { ...req })).rejects.toThrow(
+					/slug must only contain lowercase letters, numbers, and hyphens/i,
+				);
+			});
+
+			it('rejects theme source on create', async () => {
+				const ctx = createMockContext({
+					slug: 'hero-banner',
+					title: 'Hero Banner',
+					content: [{ type: 'heading' }],
+					additionalFields: {
+						source: 'theme',
+					},
+				});
+
+				await expect(validateCreateSection.call(ctx as never, { ...req })).rejects.toThrow(
+					/Section source must be "user" or "import"/i,
+				);
+			});
+		});
+
+		describe('validateUpdateSection preSend', () => {
+			const req = { method: 'PUT' as const, url: 'https://example.com' };
+
+			it('rejects empty update with descriptive error', async () => {
+				const ctx = createMockContext({ updateFields: {} });
+				await expect(validateUpdateSection.call(ctx as never, { ...req })).rejects.toThrow(
+					/At least one field must be provided to update section/i,
+				);
+			});
+
+			it('clears previewMediaId when set to null, "null", or empty string', async () => {
+				const ctx = createMockContext({
+					updateFields: { previewMediaId: 'null' },
+				});
+				const result = await validateUpdateSection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ previewMediaId: null });
+
+				const ctxEmpty = createMockContext({
+					updateFields: { previewMediaId: '' },
+				});
+				const resultEmpty = await validateUpdateSection.call(ctxEmpty as never, { ...req });
+				expect(resultEmpty.body).toEqual({ previewMediaId: null });
+			});
+
+			it('updates title, content, and keywords', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						title: 'New Title',
+						content: [{ type: 'updated' }],
+						keywords: ['new', 'keywords'],
+					},
+				});
+				const result = await validateUpdateSection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					title: 'New Title',
+					content: [{ type: 'updated' }],
+					keywords: ['new', 'keywords'],
+				});
+			});
+		});
+	});
+
+	describe('widget area operations routing', () => {
+		const widgetAreaOperations = node.description.properties.find(
+			(p) =>
+				p.name === 'operation' &&
+				(p.displayOptions?.show?.resource as string[])?.includes('widgetArea'),
+		);
+		const options = (widgetAreaOperations?.options || []) as INodePropertyOptions[];
+
+		it('registers Widget Area operation property with default getAll', () => {
+			expect(widgetAreaOperations).toBeDefined();
+			expect(widgetAreaOperations?.default).toBe('getAll');
+			expect(options).toHaveLength(8);
+		});
+
+		it('registers all 8 widget area operations with correct HTTP methods and paths', () => {
+			const expected: Record<string, { method: string; url: string }> = {
+				create: { method: 'POST', url: '/widget-areas' },
+				createWidget: {
+					method: 'POST',
+					url: '=/widget-areas/{{$parameter.widgetArea}}/widgets',
+				},
+				delete: { method: 'DELETE', url: '=/widget-areas/{{$parameter.widgetArea}}' },
+				deleteWidget: {
+					method: 'DELETE',
+					url: '=/widget-areas/{{$parameter.widgetArea}}/widgets/{{$parameter.widgetId}}',
+				},
+				get: { method: 'GET', url: '=/widget-areas/{{$parameter.widgetArea}}' },
+				getAll: { method: 'GET', url: '/widget-areas' },
+				reorderWidgets: {
+					method: 'POST',
+					url: '=/widget-areas/{{$parameter.widgetArea}}/reorder',
+				},
+				updateWidget: {
+					method: 'PUT',
+					url: '=/widget-areas/{{$parameter.widgetArea}}/widgets/{{$parameter.widgetId}}',
+				},
+			};
+
+			for (const [operation, { method, url }] of Object.entries(expected)) {
+				const option = options.find((opt) => opt.value === operation);
+				expect(option, `Missing operation ${operation}`).toBeDefined();
+				expect(option?.routing?.request?.method).toBe(method);
+				expect(option?.routing?.request?.url).toBe(url);
+			}
+		});
+
+		it('unwraps data.items for getAll and data rootProperty for other widget area operations', () => {
+			const getAll = options.find((opt) => opt.value === 'getAll');
+			expect(getAll?.routing?.output?.postReceive).toEqual([
+				{
+					type: 'rootProperty',
+					properties: {
+						property: 'data.items',
+					},
+				},
+			]);
+
+			for (const op of [
+				'create',
+				'createWidget',
+				'delete',
+				'deleteWidget',
+				'get',
+				'reorderWidgets',
+				'updateWidget',
+			]) {
+				const option = options.find((opt) => opt.value === op);
+				expect(option?.routing?.output?.postReceive).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: 'data',
+						},
+					},
+				]);
+			}
+		});
+
+		it('wires widgetAreaSelect and widgetIdProperty with required flags', () => {
+			const widgetArea = node.description.properties.find((p) => p.name === 'widgetArea');
+			expect(widgetArea).toBeDefined();
+			expect(widgetArea?.required).toBe(true);
+			expect(widgetArea?.displayOptions?.show?.resource).toEqual(['widgetArea']);
+			expect(widgetArea?.displayOptions?.show?.operation).toEqual([
+				'get',
+				'delete',
+				'createWidget',
+				'updateWidget',
+				'deleteWidget',
+				'reorderWidgets',
+			]);
+
+			const widgetId = node.description.properties.find((p) => p.name === 'widgetId');
+			expect(widgetId).toBeDefined();
+			expect(widgetId?.required).toBe(true);
+			expect(widgetId?.displayOptions?.show?.resource).toEqual(['widgetArea']);
+			expect(widgetId?.displayOptions?.show?.operation).toEqual(['updateWidget', 'deleteWidget']);
+		});
+
+		it('clearly warns about cascade widget deletion on area delete', () => {
+			const deleteOption = options.find((opt) => opt.value === 'delete');
+			expect(deleteOption?.description).toContain(
+				'Deleting a widget area also deletes its widgets.',
+			);
+		});
+
+		it('clearly notes non-destructive scope on widget delete', () => {
+			const deleteWidgetOption = options.find((opt) => opt.value === 'deleteWidget');
+			expect(deleteWidgetOption?.description).toContain(
+				'does not delete the widget area, menus, or components',
+			);
+		});
+	});
+
+	describe('widget area validation and preSend', () => {
+		const createMockContext = (params: Record<string, unknown>) => ({
+			getNodeParameter: (name: string, fallback?: unknown) =>
+				params[name] !== undefined ? params[name] : fallback,
+		});
+
+		describe('validateJsonObject', () => {
+			it('accepts valid object', () => {
+				expect(validateJsonObject({ color: 'blue' })).toEqual({ color: 'blue' });
+			});
+
+			it('accepts valid JSON string', () => {
+				expect(validateJsonObject('{"color":"blue"}')).toEqual({ color: 'blue' });
+			});
+
+			it('rejects null, undefined, empty string, arrays, and primitives', () => {
+				expect(() => validateJsonObject(null)).toThrow(/must be an object.*null/i);
+				expect(() => validateJsonObject(undefined)).toThrow(/must be an object.*undefined/i);
+				expect(() => validateJsonObject('')).toThrow(/cannot be empty/i);
+				expect(() => validateJsonObject([1, 2])).toThrow(/must be an object.*array/i);
+				expect(() => validateJsonObject('[1, 2]')).toThrow(/must evaluate to an object.*array/i);
+				expect(() => validateJsonObject(123)).toThrow(/must be an object.*number/i);
+				expect(() => validateJsonObject('not-json')).toThrow(/Invalid JSON/i);
+			});
+		});
+
+		describe('validateReorderWidgetIds', () => {
+			it('accepts valid array of unique strings', () => {
+				expect(validateReorderWidgetIds(['w1', 'w2'])).toEqual(['w1', 'w2']);
+			});
+
+			it('accepts comma-separated string', () => {
+				expect(validateReorderWidgetIds('w1, w2')).toEqual(['w1', 'w2']);
+			});
+
+			it('accepts JSON array string', () => {
+				expect(validateReorderWidgetIds('["w1", "w2"]')).toEqual(['w1', 'w2']);
+			});
+
+			it('rejects duplicate widget IDs', () => {
+				expect(() => validateReorderWidgetIds(['w1', 'w1'])).toThrow(
+					/Duplicate widget ID found in reorder list: "w1"/i,
+				);
+				expect(() => validateReorderWidgetIds('w1, w1')).toThrow(
+					/Duplicate widget ID found in reorder list: "w1"/i,
+				);
+			});
+
+			it('rejects empty or whitespace widget IDs', () => {
+				expect(() => validateReorderWidgetIds([])).toThrow(/At least 1 widget ID is required/i);
+				expect(() => validateReorderWidgetIds([''])).toThrow(/cannot be empty or whitespace/i);
+				expect(() => validateReorderWidgetIds(['   '])).toThrow(/cannot be empty or whitespace/i);
+			});
+
+			it('rejects non-string members', () => {
+				expect(() => validateReorderWidgetIds([123])).toThrow(/must be a non-empty string/i);
+			});
+		});
+
+		describe('validateCreateWidgetArea preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+
+			it('populates valid widget area body', async () => {
+				const ctx = createMockContext({
+					name: 'sidebar-main',
+					label: 'Main Sidebar',
+					additionalFields: { description: 'Sidebar for blog pages' },
+				});
+
+				const result = await validateCreateWidgetArea.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					name: 'sidebar-main',
+					label: 'Main Sidebar',
+					description: 'Sidebar for blog pages',
+				});
+			});
+
+			it('rejects blank name or label', async () => {
+				const ctxBlankName = createMockContext({ name: '', label: 'Label' });
+				await expect(
+					validateCreateWidgetArea.call(ctxBlankName as never, { ...req }),
+				).rejects.toThrow(/name is required/i);
+
+				const ctxBlankLabel = createMockContext({ name: 'sidebar', label: '' });
+				await expect(
+					validateCreateWidgetArea.call(ctxBlankLabel as never, { ...req }),
+				).rejects.toThrow(/label is required/i);
+			});
+		});
+
+		describe('validateCreateWidget preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+
+			it('populates content widget', async () => {
+				const ctx = createMockContext({
+					type: 'content',
+					title: 'Content Block',
+					content: [{ type: 'html', body: '<p>Hi</p>' }],
+				});
+
+				const result = await validateCreateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					type: 'content',
+					title: 'Content Block',
+					content: [{ type: 'html', body: '<p>Hi</p>' }],
+				});
+			});
+
+			it('populates menu widget', async () => {
+				const ctx = createMockContext({
+					type: 'menu',
+					title: 'Navigation',
+					menuName: 'main-menu',
+				});
+
+				const result = await validateCreateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					type: 'menu',
+					title: 'Navigation',
+					menuName: 'main-menu',
+				});
+			});
+
+			it('populates component widget with props', async () => {
+				const ctx = createMockContext({
+					type: 'component',
+					componentId: 'cmp_newsletter',
+					componentProps: { showTitle: true },
+				});
+
+				const result = await validateCreateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					type: 'component',
+					componentId: 'cmp_newsletter',
+					componentProps: { showTitle: true },
+				});
+			});
+
+			it('rejects invalid widget type', async () => {
+				const ctx = createMockContext({
+					type: 'invalid',
+				});
+
+				await expect(validateCreateWidget.call(ctx as never, { ...req })).rejects.toThrow(
+					/Widget type must be "content", "menu", or "component"/i,
+				);
+			});
+		});
+
+		describe('validateUpdateWidget preSend', () => {
+			const req = { method: 'PUT' as const, url: 'https://example.com' };
+
+			it('rejects empty update with descriptive error', async () => {
+				const ctx = createMockContext({ updateFields: {} });
+				await expect(validateUpdateWidget.call(ctx as never, { ...req })).rejects.toThrow(
+					/At least one field must be provided to update widget/i,
+				);
+			});
+
+			it('updates provided fields', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						title: 'New Widget Title',
+						content: [{ type: 'updated' }],
+					},
+				});
+
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					title: 'New Widget Title',
+					content: [{ type: 'updated' }],
+				});
+			});
+		});
+
+		describe('validateReorderWidgets preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+
+			it('populates widgetIds and preserves order', async () => {
+				const ctx = createMockContext({
+					widgetIds: ['wid_3', 'wid_1', 'wid_2'],
+				});
+
+				const result = await validateReorderWidgets.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					widgetIds: ['wid_3', 'wid_1', 'wid_2'],
+				});
+			});
+
+			it('rejects duplicates in reorder', async () => {
+				const ctx = createMockContext({
+					widgetIds: ['wid_1', 'wid_1'],
+				});
+
+				await expect(validateReorderWidgets.call(ctx as never, { ...req })).rejects.toThrow(
+					/Duplicate widget ID found in reorder list/i,
+				);
+			});
+		});
+	});
+
+	describe('listSearch getSections and getWidgetAreas', () => {
+		describe('getSections', () => {
+			it('formats section items as title (slug)', async () => {
+				const mockSections = [
+					{ slug: 'hero-banner', title: 'Hero Banner' },
+					{ slug: 'footer-links', title: 'Footer Links' },
+				];
+
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockSections },
+						}),
+					},
+				};
+
+				const result = await getSections.call(context as never);
+				expect(result.results).toEqual([
+					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
+					{ name: 'Footer Links (footer-links)', value: 'footer-links' },
+				]);
+			});
+
+			it('filters sections by search term', async () => {
+				const mockSections = [
+					{ slug: 'hero-banner', title: 'Hero Banner' },
+					{ slug: 'footer-links', title: 'Footer Links' },
+				];
+
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockSections },
+						}),
+					},
+				};
+
+				const result = await getSections.call(context as never, 'hero');
+				expect(result.results).toEqual([
+					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
+				]);
+			});
+
+			it('returns empty results on API error', async () => {
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => {
+							throw new Error('Network error');
+						},
+					},
+				};
+
+				const result = await getSections.call(context as never);
+				expect(result.results).toEqual([]);
+			});
+		});
+
+		describe('getWidgetAreas', () => {
+			it('formats widget area items as label (name)', async () => {
+				const mockAreas = [
+					{ name: 'sidebar-main', label: 'Main Sidebar' },
+					{ name: 'footer-1', label: 'Footer Column 1' },
+				];
+
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockAreas },
+						}),
+					},
+				};
+
+				const result = await getWidgetAreas.call(context as never);
+				expect(result.results).toEqual([
+					{ name: 'Main Sidebar (sidebar-main)', value: 'sidebar-main' },
+					{ name: 'Footer Column 1 (footer-1)', value: 'footer-1' },
+				]);
+			});
+
+			it('filters widget areas by search term', async () => {
+				const mockAreas = [
+					{ name: 'sidebar-main', label: 'Main Sidebar' },
+					{ name: 'footer-1', label: 'Footer Column 1' },
+				];
+
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockAreas },
+						}),
+					},
+				};
+
+				const result = await getWidgetAreas.call(context as never, 'footer');
+				expect(result.results).toEqual([{ name: 'Footer Column 1 (footer-1)', value: 'footer-1' }]);
+			});
+
+			it('returns empty results on API error', async () => {
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => {
+							throw new Error('Network error');
+						},
+					},
+				};
+
+				const result = await getWidgetAreas.call(context as never);
+				expect(result.results).toEqual([]);
+			});
+		});
+	});
+
 	describe('resource and operation counts', () => {
-		it('registers Comment, Menu, and Settings resources in resource options', () => {
+		it('registers 10 resources in resource options sorted alphabetically', () => {
 			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
 			const options = resourceProp?.options as INodePropertyOptions[];
-			expect(options).toHaveLength(8);
-			expect(options.some((opt) => opt.value === 'comment' && opt.name === 'Comment')).toBe(true);
-			expect(options.some((opt) => opt.value === 'menu' && opt.name === 'Menu')).toBe(true);
-			expect(options.some((opt) => opt.value === 'settings' && opt.name === 'Settings')).toBe(true);
+			expect(options).toHaveLength(10);
+			expect(options.map((opt) => opt.value)).toEqual([
+				'comment',
+				'content',
+				'media',
+				'menu',
+				'redirect',
+				'search',
+				'section',
+				'settings',
+				'taxonomy',
+				'widgetArea',
+			]);
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing 66 operations and adds 2 settings operations for 68 total', () => {
+		it('preserves existing 68 operations and adds 5 section and 8 widgetArea operations for 81 total', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -2023,7 +2738,9 @@ describe('EmDash integration tests', () => {
 			expect(countsByResource['comment']).toBe(6);
 			expect(countsByResource['menu']).toBe(9);
 			expect(countsByResource['settings']).toBe(2);
-			// Existing 7 resources sum to 66
+			expect(countsByResource['section']).toBe(5);
+			expect(countsByResource['widgetArea']).toBe(8);
+
 			expect(
 				countsByResource['content'] +
 					countsByResource['media'] +
@@ -2031,19 +2748,22 @@ describe('EmDash integration tests', () => {
 					countsByResource['search'] +
 					countsByResource['redirect'] +
 					countsByResource['comment'] +
-					countsByResource['menu'],
-			).toBe(66);
+					countsByResource['menu'] +
+					countsByResource['settings'],
+			).toBe(68);
 
-			expect(totalOperations).toBe(68);
+			expect(totalOperations).toBe(81);
 		});
 	});
 
 	describe('listSearch methods', () => {
-		it('registers getCollections, getMediaFolders, getMenus, and getTaxonomies', () => {
+		it('registers getCollections, getMediaFolders, getMenus, getSections, getTaxonomies, and getWidgetAreas', () => {
 			expect(node.methods?.listSearch?.getCollections).toBeDefined();
 			expect(node.methods?.listSearch?.getMediaFolders).toBeDefined();
 			expect(node.methods?.listSearch?.getMenus).toBeDefined();
+			expect(node.methods?.listSearch?.getSections).toBeDefined();
 			expect(node.methods?.listSearch?.getTaxonomies).toBeDefined();
+			expect(node.methods?.listSearch?.getWidgetAreas).toBeDefined();
 		});
 	});
 

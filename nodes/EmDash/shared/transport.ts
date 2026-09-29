@@ -506,3 +506,365 @@ export async function validateUpdateSettings(
 
 	return requestOptions;
 }
+
+export {
+	validateStructuredContent,
+	validateJsonObject,
+	validateStringArray,
+	validateReorderWidgetIds,
+} from './validation';
+
+import {
+	validateStructuredContent,
+	validateJsonObject,
+	validateStringArray,
+	validateReorderWidgetIds,
+} from './validation';
+
+export async function validateCreateSection(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let slug = '';
+	try {
+		slug = this.getNodeParameter('slug', '') as string;
+	} catch {
+		slug = '';
+	}
+
+	let title = '';
+	try {
+		title = this.getNodeParameter('title', '') as string;
+	} catch {
+		title = '';
+	}
+
+	let rawContent: unknown;
+	try {
+		rawContent = this.getNodeParameter('content', []);
+	} catch {
+		rawContent = [];
+	}
+
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+
+	const trimmedSlug = String(slug).trim();
+	if (!trimmedSlug) {
+		throw new Error('slug is required');
+	}
+	if (!/^[a-z0-9-]+$/.test(trimmedSlug)) {
+		throw new Error('slug must only contain lowercase letters, numbers, and hyphens');
+	}
+
+	const trimmedTitle = String(title).trim();
+	if (!trimmedTitle) {
+		throw new Error('title is required');
+	}
+
+	const validatedContent = validateStructuredContent(rawContent, 'Content');
+
+	const body: Record<string, unknown> = {
+		slug: trimmedSlug,
+		title: trimmedTitle,
+		content: validatedContent,
+	};
+
+	if (typeof additionalFields.description === 'string' && additionalFields.description.trim()) {
+		body.description = additionalFields.description.trim();
+	}
+	if (additionalFields.keywords !== undefined && additionalFields.keywords !== '') {
+		const keywords = validateStringArray(additionalFields.keywords, 'Keywords');
+		if (keywords.length > 0) {
+			body.keywords = keywords;
+		}
+	}
+	if (
+		typeof additionalFields.previewMediaId === 'string' &&
+		additionalFields.previewMediaId.trim()
+	) {
+		body.previewMediaId = additionalFields.previewMediaId.trim();
+	}
+	if (typeof additionalFields.source === 'string' && additionalFields.source.trim()) {
+		const source = additionalFields.source.trim();
+		if (source !== 'user' && source !== 'import') {
+			throw new Error(
+				'Section source must be "user" or "import" (theme sections cannot be created)',
+			);
+		}
+		body.source = source;
+	}
+	if (typeof additionalFields.themeId === 'string' && additionalFields.themeId.trim()) {
+		body.themeId = additionalFields.themeId.trim();
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateUpdateSection(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let updateFields: Record<string, unknown> = {};
+	try {
+		updateFields = (this.getNodeParameter('updateFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		updateFields = {};
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if ('slug' in updateFields && updateFields.slug !== undefined) {
+		const slug = String(updateFields.slug).trim();
+		if (!slug) {
+			throw new Error('slug cannot be empty or whitespace');
+		}
+		if (!/^[a-z0-9-]+$/.test(slug)) {
+			throw new Error('slug must only contain lowercase letters, numbers, and hyphens');
+		}
+		body.slug = slug;
+	}
+	if ('title' in updateFields && updateFields.title !== undefined) {
+		const title = String(updateFields.title).trim();
+		if (!title) {
+			throw new Error('title cannot be empty or whitespace');
+		}
+		body.title = title;
+	}
+	if ('description' in updateFields && updateFields.description !== undefined) {
+		body.description = String(updateFields.description);
+	}
+	if ('keywords' in updateFields && updateFields.keywords !== undefined) {
+		body.keywords = validateStringArray(updateFields.keywords, 'Keywords');
+	}
+	if ('content' in updateFields && updateFields.content !== undefined) {
+		body.content = validateStructuredContent(updateFields.content, 'Content');
+	}
+	if ('previewMediaId' in updateFields && updateFields.previewMediaId !== undefined) {
+		const val = updateFields.previewMediaId;
+		if (val === null || val === 'null' || val === '') {
+			body.previewMediaId = null;
+		} else if (typeof val === 'string') {
+			body.previewMediaId = val.trim();
+		} else {
+			body.previewMediaId = String(val);
+		}
+	}
+
+	if (Object.keys(body).length === 0) {
+		throw new Error('At least one field must be provided to update section');
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateCreateWidgetArea(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let name = '';
+	try {
+		name = this.getNodeParameter('name', '') as string;
+	} catch {
+		name = '';
+	}
+
+	let label = '';
+	try {
+		label = this.getNodeParameter('label', '') as string;
+	} catch {
+		label = '';
+	}
+
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+
+	const trimmedName = String(name).trim();
+	if (!trimmedName) {
+		throw new Error('name is required');
+	}
+
+	const trimmedLabel = String(label).trim();
+	if (!trimmedLabel) {
+		throw new Error('label is required');
+	}
+
+	const body: Record<string, unknown> = {
+		name: trimmedName,
+		label: trimmedLabel,
+	};
+
+	if (typeof additionalFields.description === 'string' && additionalFields.description.trim()) {
+		body.description = additionalFields.description.trim();
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateCreateWidget(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let type = 'content';
+	try {
+		type = this.getNodeParameter('type', 'content') as string;
+	} catch {
+		type = 'content';
+	}
+
+	let title = '';
+	try {
+		title = this.getNodeParameter('title', '') as string;
+	} catch {
+		title = '';
+	}
+
+	if (!['content', 'menu', 'component'].includes(type)) {
+		throw new Error('Widget type must be "content", "menu", or "component"');
+	}
+
+	const body: Record<string, unknown> = {
+		type,
+	};
+
+	if (typeof title === 'string' && title.trim()) {
+		body.title = title.trim();
+	}
+
+	if (type === 'content') {
+		let content: unknown;
+		try {
+			content = this.getNodeParameter('content', []);
+		} catch {
+			content = [];
+		}
+		body.content = validateStructuredContent(content, 'Content');
+	} else if (type === 'menu') {
+		let rawMenu: unknown;
+		try {
+			rawMenu = this.getNodeParameter('menuName', '');
+		} catch {
+			rawMenu = '';
+		}
+		const menuName =
+			typeof rawMenu === 'object' && rawMenu !== null
+				? String((rawMenu as { value?: unknown }).value || '').trim()
+				: String(rawMenu || '').trim();
+		if (!menuName) {
+			throw new Error('menuName is required for menu widgets');
+		}
+		body.menuName = menuName;
+	} else if (type === 'component') {
+		let componentId = '';
+		try {
+			componentId = this.getNodeParameter('componentId', '') as string;
+		} catch {
+			componentId = '';
+		}
+		const trimmedId = String(componentId).trim();
+		if (!trimmedId) {
+			throw new Error('componentId is required for component widgets');
+		}
+		body.componentId = trimmedId;
+
+		let componentProps: unknown;
+		try {
+			componentProps = this.getNodeParameter('componentProps', '{}');
+		} catch {
+			componentProps = '{}';
+		}
+		if (
+			componentProps !== undefined &&
+			componentProps !== null &&
+			componentProps !== '' &&
+			componentProps !== '{}'
+		) {
+			body.componentProps = validateJsonObject(componentProps, 'Component Props');
+		}
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateUpdateWidget(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let updateFields: Record<string, unknown> = {};
+	try {
+		updateFields = (this.getNodeParameter('updateFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		updateFields = {};
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if ('type' in updateFields && updateFields.type !== undefined) {
+		const type = String(updateFields.type).trim();
+		if (!['content', 'menu', 'component'].includes(type)) {
+			throw new Error('Widget type must be "content", "menu", or "component"');
+		}
+		body.type = type;
+	}
+	if ('title' in updateFields && updateFields.title !== undefined) {
+		body.title = String(updateFields.title).trim() || null;
+	}
+	if ('content' in updateFields && updateFields.content !== undefined) {
+		body.content = validateStructuredContent(updateFields.content, 'Content');
+	}
+	if ('menuName' in updateFields && updateFields.menuName !== undefined) {
+		const raw = updateFields.menuName;
+		const name =
+			typeof raw === 'object' && raw !== null
+				? String((raw as { value?: unknown }).value || '').trim()
+				: String(raw || '').trim();
+		body.menuName = name || null;
+	}
+	if ('componentId' in updateFields && updateFields.componentId !== undefined) {
+		body.componentId = String(updateFields.componentId).trim() || null;
+	}
+	if ('componentProps' in updateFields && updateFields.componentProps !== undefined) {
+		body.componentProps = validateJsonObject(updateFields.componentProps, 'Component Props');
+	}
+
+	if (Object.keys(body).length === 0) {
+		throw new Error('At least one field must be provided to update widget');
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateReorderWidgets(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawWidgetIds: unknown;
+	try {
+		rawWidgetIds = this.getNodeParameter('widgetIds', []);
+	} catch {
+		rawWidgetIds = [];
+	}
+
+	const validatedIds = validateReorderWidgetIds(rawWidgetIds);
+
+	requestOptions.body = {
+		widgetIds: validatedIds,
+	};
+
+	return requestOptions;
+}
