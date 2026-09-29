@@ -1133,6 +1133,33 @@ describe('EmDash integration tests', () => {
 				expect(parseAndValidateCommentIds([' cmt_1 ', 'cmt_2 '])).toEqual(['cmt_1', 'cmt_2']);
 				expect(parseAndValidateCommentIds(' cmt_single ')).toEqual(['cmt_single']);
 			});
+
+			it('rejects non-string inputs such as numbers, objects, and booleans', () => {
+				expect(() => parseAndValidateCommentIds(123)).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+				expect(() => parseAndValidateCommentIds({ id: 'cmt_1' })).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+				expect(() => parseAndValidateCommentIds(true)).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+			});
+
+			it('rejects non-string elements inside an array', () => {
+				expect(() => parseAndValidateCommentIds([123])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds(['cmt_1', 123])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds([null])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds([{}])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+			});
 		});
 
 		describe('validateBulkCommentAction preSend hook', () => {
@@ -1156,6 +1183,48 @@ describe('EmDash integration tests', () => {
 						req,
 					),
 				).rejects.toThrow('At least 1 comment ID is required');
+			});
+
+			it('rejects missing or blank action', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: '' }) as never,
+						req,
+					),
+				).rejects.toThrow('Action is required for bulk comment action');
+
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: '   ' }) as never,
+						req,
+					),
+				).rejects.toThrow('Action is required for bulk comment action');
+
+				await expect(
+					validateBulkCommentAction.call(createMockContext({ ids: 'cmt_1' }) as never, req),
+				).rejects.toThrow('Action is required for bulk comment action');
+			});
+
+			it('rejects invalid action strings with descriptive error', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: 'unapprove' }) as never,
+						req,
+					),
+				).rejects.toThrow(
+					'Invalid bulk comment action: "unapprove". Must be one of: approve, spam, trash, delete',
+				);
+
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: 'invalid' }) as never,
+						req,
+					),
+				).rejects.toThrow(
+					'Invalid bulk comment action: "invalid". Must be one of: approve, spam, trash, delete',
+				);
 			});
 
 			it('rejects >100 IDs', async () => {

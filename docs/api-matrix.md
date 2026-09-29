@@ -173,6 +173,6 @@ The webhook endpoint verifies the caller using a shared secret token:
 
 Public comment submission and listing endpoints (`GET /content/{collection}/{id}/comments` and `POST /content/{collection}/{id}/comments`) from the EmDash public API surface are intentionally deferred from this community node:
 
-- **Authentication model**: Public comment endpoints are designed for unauthenticated client-side interaction protected by CSRF tokens and Cloudflare Turnstile / CAPTCHA verification rather than administrative Personal Access Tokens.
+- **Authentication model**: Public comment endpoints are designed for unauthenticated client-side interaction protected by Origin and `X-EmDash-Request` header CSRF checks, with optional Cloudflare Turnstile verification, rather than administrative Personal Access Tokens.
 - **Node architecture**: The EmDash community node requires an authenticated `emdashApi` credential with site URL and Bearer PAT for all actions. Exposing public submission operations that bypass credential validation or require client CAPTCHA challenges does not align with the node's server-to-server authenticated architecture.
 - **Moderation focus**: Automations in n8n operate on the moderation lifecycle (reviewing, filtering, approving, marking spam, trashing, or bulk acting via `/_emdash/api/admin/comments`), which is fully supported with strict PAT scope enforcement.

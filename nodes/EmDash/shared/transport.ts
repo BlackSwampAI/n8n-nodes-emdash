@@ -238,8 +238,6 @@ export function parseAndValidateCommentIds(value: unknown): string[] {
 		} else {
 			rawList = trimmed.split(',');
 		}
-	} else if (typeof value === 'number') {
-		rawList = [String(value)];
 	} else {
 		throw new Error('Comment IDs must be an array, comma-separated string, or JSON array string');
 	}
@@ -256,18 +254,20 @@ export function parseAndValidateCommentIds(value: unknown): string[] {
 
 	const ids: string[] = [];
 	for (const item of rawList) {
-		if (item === null || item === undefined) {
+		if (typeof item !== 'string') {
+			throw new Error('Comment ID must be a non-empty string');
+		}
+		const trimmed = item.trim();
+		if (!trimmed) {
 			throw new Error('Comment ID cannot be empty or whitespace');
 		}
-		const str = String(item).trim();
-		if (!str) {
-			throw new Error('Comment ID cannot be empty or whitespace');
-		}
-		ids.push(str);
+		ids.push(trimmed);
 	}
 
 	return ids;
 }
+
+const ALLOWED_BULK_ACTIONS = ['approve', 'spam', 'trash', 'delete'] as const;
 
 export async function validateBulkCommentAction(
 	this: IExecuteSingleFunctions,
@@ -280,9 +280,9 @@ export async function validateBulkCommentAction(
 		rawIds = '';
 	}
 
-	let action = '';
+	let action: unknown;
 	try {
-		action = this.getNodeParameter('action', '') as string;
+		action = this.getNodeParameter('action', '');
 	} catch {
 		action = '';
 	}
@@ -293,12 +293,19 @@ export async function validateBulkCommentAction(
 		throw new Error('Action is required for bulk comment action');
 	}
 
+	const trimmedAction = action.trim();
+	if (!ALLOWED_BULK_ACTIONS.includes(trimmedAction as (typeof ALLOWED_BULK_ACTIONS)[number])) {
+		throw new Error(
+			`Invalid bulk comment action: "${trimmedAction}". Must be one of: approve, spam, trash, delete`,
+		);
+	}
+
 	requestOptions.body = {
 		...(typeof requestOptions.body === 'object' && requestOptions.body !== null
 			? (requestOptions.body as Record<string, unknown>)
 			: {}),
 		ids: validatedIds,
-		action: action.trim(),
+		action: trimmedAction,
 	};
 
 	return requestOptions;
