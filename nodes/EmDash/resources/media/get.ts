@@ -14,7 +14,8 @@ export const mediaGetDescription: INodeProperties[] = [
 		displayOptions: {
 			show: showOnlyForMediaGet,
 		},
-		description: 'Whether to include content item usage reference details',
+		description:
+			'Whether to include a coverage-aware usage summary on each media item. Note: usage.count is null unless caller holds both RBAC content:read_drafts permission and admin token scope; for full usage details use Get Usage.',
 		routing: {
 			request: {
 				qs: {

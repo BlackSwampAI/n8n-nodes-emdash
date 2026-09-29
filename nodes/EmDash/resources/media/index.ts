@@ -1,6 +1,13 @@
 import type { INodeProperties } from 'n8n-workflow';
 import { mediaIdProperty, folderIdProperty } from '../../shared/descriptions';
-import { prepareMediaUpload } from '../../shared/transport';
+import {
+	prepareMediaUpload,
+	prepareMediaReplacement,
+	prepareGetUploadTarget,
+	preparePendingMediaUpload,
+	prepareConfirmUpload,
+	validateMediaUpdate,
+} from '../../shared/transport';
 import { mediaGetManyDescription } from './getAll';
 import { mediaGetDescription } from './get';
 import { mediaUploadDescription } from './upload';
@@ -12,6 +19,10 @@ import { mediaGetFolderDescription } from './getFolder';
 import { mediaCreateFolderDescription } from './createFolder';
 import { mediaUpdateFolderDescription } from './updateFolder';
 import { mediaDeleteFolderDescription } from './deleteFolder';
+import { mediaReplaceImageDescription } from './replaceImage';
+import { mediaGetUploadTargetDescription } from './getUploadTarget';
+import { mediaUploadPendingDescription } from './uploadPending';
+import { mediaConfirmUploadDescription } from './confirmUpload';
 
 const showOnlyForMedia = {
 	resource: ['media'],
@@ -27,6 +38,31 @@ export const mediaDescription: INodeProperties[] = [
 			show: showOnlyForMedia,
 		},
 		options: [
+			{
+				name: 'Confirm Upload',
+				value: 'confirmUpload',
+				action: 'Confirm a staged media upload',
+				description: 'Finalize a pending upload after binary data has been written',
+				routing: {
+					request: {
+						method: 'POST',
+						url: '=/media/{{$parameter.mediaId}}/confirm',
+					},
+					send: {
+						preSend: [prepareConfirmUpload],
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
 			{
 				name: 'Create Folder',
 				value: 'createFolder',
@@ -182,14 +218,66 @@ export const mediaDescription: INodeProperties[] = [
 				},
 			},
 			{
+				name: 'Get Upload Target',
+				value: 'getUploadTarget',
+				action: 'Get upload target URL',
+				description: 'Request a target URL or direct upload destination for staged media upload',
+				routing: {
+					request: {
+						method: 'POST',
+						url: '/media/upload-url',
+					},
+					send: {
+						preSend: [prepareGetUploadTarget],
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
 				name: 'Get Usage',
 				value: 'getUsage',
 				action: 'Get media usage',
-				description: 'Get content items referencing this media file',
+				description:
+					'Get content items referencing this media file (requires PAT scope "admin" and RBAC "media:read" + "content:read_drafts")',
 				routing: {
 					request: {
 						method: 'GET',
 						url: '=/media/{{$parameter.mediaId}}/usage',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
+				name: 'Replace Image',
+				value: 'replaceImage',
+				action: 'Replace a media image file',
+				description:
+					'Replace the binary file of an existing image while preserving its ID and storage identity (resets blurhash, dominant color, and focal points to null)',
+				routing: {
+					request: {
+						method: 'PUT',
+						url: '=/media/{{$parameter.mediaId}}/replace',
+					},
+					send: {
+						preSend: [prepareMediaReplacement],
 					},
 					output: {
 						postReceive: [
@@ -235,6 +323,9 @@ export const mediaDescription: INodeProperties[] = [
 						method: 'PUT',
 						url: '=/media/{{$parameter.mediaId}}',
 					},
+					send: {
+						preSend: [validateMediaUpdate],
+					},
 					output: {
 						postReceive: [
 							{
@@ -272,6 +363,31 @@ export const mediaDescription: INodeProperties[] = [
 					},
 				},
 			},
+			{
+				name: 'Upload Pending File',
+				value: 'uploadPending',
+				action: 'Upload binary data for a pending media file',
+				description: 'Upload raw binary data to a staged pending media upload endpoint',
+				routing: {
+					request: {
+						method: 'PUT',
+						url: '=/media/{{$parameter.mediaId}}/upload',
+					},
+					send: {
+						preSend: [preparePendingMediaUpload],
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
 		],
 		default: 'getAll',
 	},
@@ -288,4 +404,8 @@ export const mediaDescription: INodeProperties[] = [
 	...mediaCreateFolderDescription,
 	...mediaUpdateFolderDescription,
 	...mediaDeleteFolderDescription,
+	...mediaReplaceImageDescription,
+	...mediaGetUploadTargetDescription,
+	...mediaUploadPendingDescription,
+	...mediaConfirmUploadDescription,
 ];

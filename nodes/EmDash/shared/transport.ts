@@ -135,22 +135,66 @@ export async function prepareMediaUpload(
 	let folderId: string | undefined;
 	let deduplicate: boolean | undefined;
 	let ensureUniqueFilename: boolean | undefined;
+	let fieldId: string | undefined;
+	let width: number | undefined;
+	let height: number | undefined;
+	let thumbnailBinaryPropertyName: string | undefined;
 
+	let additional: IDataObject = {};
 	try {
-		const additional = this.getNodeParameter('additionalFields', {}) as IDataObject;
-		if (additional && typeof additional === 'object') {
-			if (typeof additional.folderId === 'string' && additional.folderId.trim() !== '') {
-				folderId = additional.folderId.trim();
-			}
-			if (typeof additional.deduplicate === 'boolean') {
-				deduplicate = additional.deduplicate;
-			}
-			if (typeof additional.ensureUniqueFilename === 'boolean') {
-				ensureUniqueFilename = additional.ensureUniqueFilename;
-			}
-		}
+		additional = (this.getNodeParameter('additionalFields', {}) as IDataObject) || {};
 	} catch {
-		// ignore
+		additional = {};
+	}
+	if (
+		additional &&
+		typeof additional.additionalFields === 'object' &&
+		additional.additionalFields !== null
+	) {
+		additional = additional.additionalFields as IDataObject;
+	}
+
+	if (additional && typeof additional === 'object') {
+		if (typeof additional.folderId === 'string' && additional.folderId.trim() !== '') {
+			folderId = additional.folderId.trim();
+		}
+		if (typeof additional.deduplicate === 'boolean') {
+			deduplicate = additional.deduplicate;
+		}
+		if (typeof additional.ensureUniqueFilename === 'boolean') {
+			ensureUniqueFilename = additional.ensureUniqueFilename;
+		}
+		if (typeof additional.fieldId === 'string' && additional.fieldId.trim() !== '') {
+			fieldId = additional.fieldId.trim();
+		}
+		if (
+			additional.width !== undefined &&
+			additional.width !== null &&
+			(additional.width as unknown) !== ''
+		) {
+			const w = additional.width;
+			if (typeof w !== 'number' || !Number.isInteger(w) || w <= 0) {
+				throw new Error('Width must be an integer greater than 0');
+			}
+			width = w;
+		}
+		if (
+			additional.height !== undefined &&
+			additional.height !== null &&
+			(additional.height as unknown) !== ''
+		) {
+			const h = additional.height;
+			if (typeof h !== 'number' || !Number.isInteger(h) || h <= 0) {
+				throw new Error('Height must be an integer greater than 0');
+			}
+			height = h;
+		}
+		if (
+			typeof additional.thumbnailBinaryPropertyName === 'string' &&
+			additional.thumbnailBinaryPropertyName.trim() !== ''
+		) {
+			thumbnailBinaryPropertyName = additional.thumbnailBinaryPropertyName.trim();
+		}
 	}
 
 	if (folderId === undefined) {
@@ -183,12 +227,85 @@ export async function prepareMediaUpload(
 			// ignore
 		}
 	}
+	if (fieldId === undefined) {
+		try {
+			const val = this.getNodeParameter('fieldId', '') as string;
+			if (typeof val === 'string' && val.trim() !== '') {
+				fieldId = val.trim();
+			}
+		} catch {
+			// ignore
+		}
+	}
+	if (width === undefined) {
+		let val: unknown;
+		try {
+			val = this.getNodeParameter('width', undefined);
+		} catch {
+			val = undefined;
+		}
+		if (val !== undefined && val !== null && (val as unknown) !== '') {
+			if (typeof val !== 'number' || !Number.isInteger(val) || val <= 0) {
+				throw new Error('Width must be an integer greater than 0');
+			}
+			width = val as number;
+		}
+	}
+	if (height === undefined) {
+		let val: unknown;
+		try {
+			val = this.getNodeParameter('height', undefined);
+		} catch {
+			val = undefined;
+		}
+		if (val !== undefined && val !== null && (val as unknown) !== '') {
+			if (typeof val !== 'number' || !Number.isInteger(val) || val <= 0) {
+				throw new Error('Height must be an integer greater than 0');
+			}
+			height = val as number;
+		}
+	}
+	if (thumbnailBinaryPropertyName === undefined) {
+		try {
+			const val = this.getNodeParameter('thumbnailBinaryPropertyName', '') as string;
+			if (typeof val === 'string' && val.trim() !== '') {
+				thumbnailBinaryPropertyName = val.trim();
+			}
+		} catch {
+			// ignore
+		}
+	}
 
 	const formData = new FormData();
 	const mimeType = binaryData?.mimeType || 'application/octet-stream';
 	const fileName = binaryData?.fileName || 'file';
 	const blob = new Blob([dataBuffer as unknown as Uint8Array<ArrayBuffer>], { type: mimeType });
 	formData.append('file', blob, fileName);
+
+	if (thumbnailBinaryPropertyName) {
+		let thumbBinaryData: { fileName?: string; mimeType?: string };
+		let thumbBuffer: Buffer;
+		try {
+			thumbBinaryData = this.helpers.assertBinaryData(thumbnailBinaryPropertyName);
+		} catch {
+			// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+			thumbBinaryData = this.helpers.assertBinaryData(itemIndex, thumbnailBinaryPropertyName);
+		}
+
+		try {
+			thumbBuffer = await this.helpers.getBinaryDataBuffer(thumbnailBinaryPropertyName);
+		} catch {
+			// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+			thumbBuffer = await this.helpers.getBinaryDataBuffer(itemIndex, thumbnailBinaryPropertyName);
+		}
+
+		const thumbMimeType = thumbBinaryData?.mimeType || 'application/octet-stream';
+		const thumbFileName = thumbBinaryData?.fileName || 'thumbnail';
+		const thumbBlob = new Blob([thumbBuffer as unknown as Uint8Array<ArrayBuffer>], {
+			type: thumbMimeType,
+		});
+		formData.append('thumbnail', thumbBlob, thumbFileName);
+	}
 
 	if (folderId) {
 		formData.append('folderId', folderId);
@@ -199,6 +316,15 @@ export async function prepareMediaUpload(
 	if (ensureUniqueFilename !== undefined) {
 		formData.append('ensureUniqueFilename', String(ensureUniqueFilename));
 	}
+	if (fieldId) {
+		formData.append('fieldId', fieldId);
+	}
+	if (width !== undefined) {
+		formData.append('width', String(width));
+	}
+	if (height !== undefined) {
+		formData.append('height', String(height));
+	}
 
 	requestOptions.body = formData;
 	if (requestOptions.headers) {
@@ -206,6 +332,379 @@ export async function prepareMediaUpload(
 		delete requestOptions.headers['content-type'];
 	}
 
+	return requestOptions;
+}
+
+export async function prepareMediaReplacement(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let width: unknown;
+	try {
+		width = this.getNodeParameter('width');
+	} catch {
+		width = undefined;
+	}
+	if (typeof width !== 'number' || !Number.isInteger(width) || width <= 0) {
+		throw new Error('Width must be an integer greater than 0');
+	}
+
+	let height: unknown;
+	try {
+		height = this.getNodeParameter('height');
+	} catch {
+		height = undefined;
+	}
+	if (typeof height !== 'number' || !Number.isInteger(height) || height <= 0) {
+		throw new Error('Height must be an integer greater than 0');
+	}
+
+	let binaryPropertyName = 'data';
+	try {
+		const prop = this.getNodeParameter('binaryPropertyName', 'data');
+		if (typeof prop === 'string' && prop.trim() !== '') {
+			binaryPropertyName = prop.trim();
+		}
+	} catch {
+		// keep default 'data'
+	}
+
+	const itemIndex = typeof this.getItemIndex === 'function' ? this.getItemIndex() : 0;
+
+	let binaryData: { fileName?: string; mimeType?: string };
+	let dataBuffer: Buffer;
+
+	try {
+		binaryData = this.helpers.assertBinaryData(binaryPropertyName);
+	} catch {
+		// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+		binaryData = this.helpers.assertBinaryData(itemIndex, binaryPropertyName);
+	}
+
+	try {
+		dataBuffer = await this.helpers.getBinaryDataBuffer(binaryPropertyName);
+	} catch {
+		// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+		dataBuffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
+	}
+
+	const formData = new FormData();
+	const mimeType = binaryData?.mimeType || 'application/octet-stream';
+	const fileName = binaryData?.fileName || 'file';
+	const blob = new Blob([dataBuffer as unknown as Uint8Array<ArrayBuffer>], { type: mimeType });
+	formData.append('file', blob, fileName);
+	formData.append('width', String(width));
+	formData.append('height', String(height));
+
+	requestOptions.body = formData;
+	if (requestOptions.headers) {
+		delete requestOptions.headers['Content-Type'];
+		delete requestOptions.headers['content-type'];
+	}
+
+	return requestOptions;
+}
+
+export async function prepareGetUploadTarget(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let filename: string;
+	try {
+		filename = this.getNodeParameter('filename', '') as string;
+	} catch {
+		filename = '';
+	}
+	const trimmedFilename = String(filename ?? '').trim();
+	if (!trimmedFilename) {
+		throw new Error('Filename is required');
+	}
+
+	let contentType: string;
+	try {
+		contentType = this.getNodeParameter('contentType', '') as string;
+	} catch {
+		contentType = '';
+	}
+	const trimmedContentType = String(contentType ?? '').trim();
+	if (!trimmedContentType) {
+		throw new Error('Content Type is required');
+	}
+
+	let size: unknown;
+	try {
+		size = this.getNodeParameter('size');
+	} catch {
+		size = undefined;
+	}
+	if (typeof size !== 'number' || !Number.isInteger(size) || size < 0) {
+		throw new Error('Size must be an integer greater than or equal to 0');
+	}
+
+	const body: Record<string, unknown> = {
+		filename: trimmedFilename,
+		contentType: trimmedContentType,
+		size,
+	};
+
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+
+	if (typeof additionalFields.contentHash === 'string' && additionalFields.contentHash.trim()) {
+		body.contentHash = additionalFields.contentHash.trim();
+	}
+	if (typeof additionalFields.fieldId === 'string' && additionalFields.fieldId.trim()) {
+		body.fieldId = additionalFields.fieldId.trim();
+	}
+	if (typeof additionalFields.deduplicate === 'boolean') {
+		body.deduplicate = additionalFields.deduplicate;
+	}
+	if (typeof additionalFields.ensureUniqueFilename === 'boolean') {
+		body.ensureUniqueFilename = additionalFields.ensureUniqueFilename;
+	}
+	if ('folderId' in additionalFields && additionalFields.folderId !== undefined) {
+		const rawFolderId = additionalFields.folderId;
+		if (rawFolderId === null) {
+			body.folderId = null;
+		} else if (typeof rawFolderId === 'string') {
+			const trimmed = rawFolderId.trim();
+			if (trimmed === '' || trimmed === 'unfiled' || trimmed === 'null') {
+				body.folderId = null;
+			} else {
+				body.folderId = trimmed;
+			}
+		}
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function preparePendingMediaUpload(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let binaryPropertyName = 'data';
+	try {
+		const prop = this.getNodeParameter('binaryPropertyName', 'data');
+		if (typeof prop === 'string' && prop.trim() !== '') {
+			binaryPropertyName = prop.trim();
+		}
+	} catch {
+		// keep default 'data'
+	}
+
+	const itemIndex = typeof this.getItemIndex === 'function' ? this.getItemIndex() : 0;
+
+	let binaryData: { fileName?: string; mimeType?: string };
+	let dataBuffer: Buffer;
+
+	try {
+		binaryData = this.helpers.assertBinaryData(binaryPropertyName);
+	} catch {
+		// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+		binaryData = this.helpers.assertBinaryData(itemIndex, binaryPropertyName);
+	}
+
+	try {
+		dataBuffer = await this.helpers.getBinaryDataBuffer(binaryPropertyName);
+	} catch {
+		// @ts-expect-error fallback if helper uses multi-item signature (itemIndex, propertyName)
+		dataBuffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
+	}
+
+	requestOptions.body = dataBuffer;
+	if (!requestOptions.headers) {
+		requestOptions.headers = {};
+	}
+	const mimeType = binaryData?.mimeType || 'application/octet-stream';
+	requestOptions.headers['Content-Type'] = mimeType;
+	requestOptions.headers['Content-Length'] = String(dataBuffer.length);
+
+	return requestOptions;
+}
+
+export async function prepareConfirmUpload(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+	if (
+		additionalFields &&
+		typeof additionalFields.additionalFields === 'object' &&
+		additionalFields.additionalFields !== null
+	) {
+		additionalFields = additionalFields.additionalFields as Record<string, unknown>;
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if (
+		'size' in additionalFields &&
+		additionalFields.size !== undefined &&
+		additionalFields.size !== null &&
+		(additionalFields.size as unknown) !== ''
+	) {
+		const size = additionalFields.size;
+		if (typeof size !== 'number' || !Number.isInteger(size) || size < 0) {
+			throw new Error('Size must be an integer greater than or equal to 0');
+		}
+		body.size = size;
+	}
+
+	if (
+		'width' in additionalFields &&
+		additionalFields.width !== undefined &&
+		additionalFields.width !== null &&
+		(additionalFields.width as unknown) !== ''
+	) {
+		const width = additionalFields.width;
+		if (typeof width !== 'number' || !Number.isInteger(width) || width <= 0) {
+			throw new Error('Width must be an integer greater than 0');
+		}
+		body.width = width;
+	}
+
+	if (
+		'height' in additionalFields &&
+		additionalFields.height !== undefined &&
+		additionalFields.height !== null &&
+		(additionalFields.height as unknown) !== ''
+	) {
+		const height = additionalFields.height;
+		if (typeof height !== 'number' || !Number.isInteger(height) || height <= 0) {
+			throw new Error('Height must be an integer greater than 0');
+		}
+		body.height = height;
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateMediaUpdate(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let updateFields: Record<string, unknown> = {};
+	try {
+		updateFields = (this.getNodeParameter('updateFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		updateFields = {};
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if ('alt' in updateFields && updateFields.alt !== undefined) {
+		body.alt = String(updateFields.alt);
+	}
+
+	if ('caption' in updateFields && updateFields.caption !== undefined) {
+		body.caption = String(updateFields.caption);
+	}
+
+	if (
+		'width' in updateFields &&
+		updateFields.width !== undefined &&
+		updateFields.width !== null &&
+		(updateFields.width as unknown) !== ''
+	) {
+		const width = updateFields.width;
+		if (typeof width !== 'number' || !Number.isInteger(width) || width <= 0) {
+			throw new Error('Width must be an integer greater than 0');
+		}
+		body.width = width;
+	}
+
+	if (
+		'height' in updateFields &&
+		updateFields.height !== undefined &&
+		updateFields.height !== null &&
+		(updateFields.height as unknown) !== ''
+	) {
+		const height = updateFields.height;
+		if (typeof height !== 'number' || !Number.isInteger(height) || height <= 0) {
+			throw new Error('Height must be an integer greater than 0');
+		}
+		body.height = height;
+	}
+
+	const hasClearFocalPoint = updateFields.clearFocalPoint === true;
+	const hasFocalX =
+		'focalX' in updateFields &&
+		updateFields.focalX !== undefined &&
+		(updateFields.focalX as unknown) !== '';
+	const hasFocalY =
+		'focalY' in updateFields &&
+		updateFields.focalY !== undefined &&
+		(updateFields.focalY as unknown) !== '';
+
+	if (hasClearFocalPoint) {
+		body.focalX = null;
+		body.focalY = null;
+	} else if (hasFocalX || hasFocalY) {
+		if (!hasFocalX || !hasFocalY) {
+			throw new Error(
+				'Both focalX and focalY must be provided together (numbers between 0 and 1, or both null to clear)',
+			);
+		}
+		const focalX = updateFields.focalX;
+		const focalY = updateFields.focalY;
+
+		if (focalX === null && focalY === null) {
+			body.focalX = null;
+			body.focalY = null;
+		} else if (
+			typeof focalX === 'number' &&
+			typeof focalY === 'number' &&
+			!Number.isNaN(focalX) &&
+			!Number.isNaN(focalY) &&
+			focalX >= 0 &&
+			focalX <= 1 &&
+			focalY >= 0 &&
+			focalY <= 1
+		) {
+			body.focalX = focalX;
+			body.focalY = focalY;
+		} else {
+			throw new Error(
+				'Both focalX and focalY must be provided together (numbers between 0 and 1, or both null to clear)',
+			);
+		}
+	}
+
+	if ('folderId' in updateFields && updateFields.folderId !== undefined) {
+		const rawFolderId = updateFields.folderId;
+		if (rawFolderId === null) {
+			body.folderId = null;
+		} else if (typeof rawFolderId === 'string') {
+			const trimmed = rawFolderId.trim();
+			if (trimmed === '' || trimmed === 'unfiled' || trimmed === 'null') {
+				body.folderId = null;
+			} else {
+				body.folderId = trimmed;
+			}
+		} else {
+			throw new Error('Folder ID must be a string or null');
+		}
+	}
+
+	if (Object.keys(body).length === 0) {
+		throw new Error('At least one media property must be provided for update');
+	}
+
+	requestOptions.body = body;
 	return requestOptions;
 }
 

@@ -24,12 +24,6 @@ export const mediaUpdateDescription: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Alternative text for accessibility',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'alt',
-					},
-				},
 			},
 			{
 				displayName: 'Caption',
@@ -37,12 +31,14 @@ export const mediaUpdateDescription: INodeProperties[] = [
 				type: 'string',
 				default: '',
 				description: 'Caption text for the media file',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'caption',
-					},
-				},
+			},
+			{
+				displayName: 'Clear Focal Point',
+				name: 'clearFocalPoint',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to clear the focal point coordinates (sets both focalX and focalY to null)',
 			},
 			{
 				displayName: 'Focal X',
@@ -55,12 +51,6 @@ export const mediaUpdateDescription: INodeProperties[] = [
 					numberPrecision: 2,
 				},
 				description: 'Focal point horizontal position (0.0 to 1.0)',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'focalX',
-					},
-				},
 			},
 			{
 				displayName: 'Focal Y',
@@ -73,52 +63,33 @@ export const mediaUpdateDescription: INodeProperties[] = [
 					numberPrecision: 2,
 				},
 				description: 'Focal point vertical position (0.0 to 1.0)',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'focalY',
-					},
-				},
 			},
 			{
 				displayName: 'Folder ID',
 				name: 'folderId',
 				type: 'string',
 				default: '',
-				description: 'The ID of the folder to move the media file to, or empty for unfiled',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'folderId',
-						value: '={{$value || null}}',
-					},
-				},
+				description: 'The ID of the folder to move the media file to, or "unfiled" for unfiled',
 			},
 			{
 				displayName: 'Height',
 				name: 'height',
 				type: 'number',
-				default: 0,
-				description: 'Image height in pixels',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'height',
-					},
+				typeOptions: {
+					minValue: 1,
 				},
+				default: undefined,
+				description: 'Image height in pixels (must be an integer > 0)',
 			},
 			{
 				displayName: 'Width',
 				name: 'width',
 				type: 'number',
-				default: 0,
-				description: 'Image width in pixels',
-				routing: {
-					send: {
-						type: 'body',
-						property: 'width',
-					},
+				typeOptions: {
+					minValue: 1,
 				},
+				default: undefined,
+				description: 'Image width in pixels (must be an integer > 0)',
 			},
 		],
 	},

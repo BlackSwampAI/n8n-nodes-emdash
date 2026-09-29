@@ -51,7 +51,7 @@ Effective authorization requires both the PAT scope and the user's underlying RB
     - **Acquire Edit Lock**: PAT `content:write`, RBAC `content:edit_own` / `content:edit_any`.
     - **Release Edit Lock**: PAT `content:write`, RBAC `content:edit_own` / `content:edit_any`.
   - _Important note on token scopes_: There is NO Personal Access Token scope named `content:read_drafts`. Draft visibility is enforced via internal user RBAC role capabilities under the `content:read` PAT scope.
-- **Media operations**: Read queries (`GET`) require `media:read`. Mutations (binary uploads, metadata updates, folder creation, folder rename, and file/folder deletion) require `media:write`.
+- **Media operations**: Read queries (`GET`) generally require `media:read`, except **Get Usage** which requires Personal Access Token scope `admin` (not `media:read`) alongside RBAC capabilities `media:read` + `content:read_drafts`. For **Get** and **Get Many** with `includeUsage=1`, an inline coverage-aware usage summary is returned, but `usage.count` is only readable when the caller holds both the RBAC `content:read_drafts` capability and, when authenticated by a PAT/OAuth token, the `admin` token scope (a `media:read` PAT alone cannot expose draft-derived usage counts). Mutations (binary uploads, staged upload target generation, raw chunk uploads, confirmation, image replacement, metadata updates, folder creation, folder rename, and file/folder deletion) require `media:write`.
 - **Menu operations**:
   - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `menus:manage` (which is also implicitly granted by `content:write` or `admin`). EmDash does NOT define `menus:read`, `menu:read`, or `menu:write` as Personal Access Token scopes.
   - **RBAC permissions**: The authenticated user must separately possess the `menus:read` capability for reads, and `menus:manage` capability (Editor or Administrator role) for mutations.
@@ -78,7 +78,7 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 87 operations across 10 core resources:
+The EmDash community node provides 91 operations across 10 core resources:
 
 ### Comment (6 operations)
 
@@ -114,14 +114,18 @@ The EmDash community node provides 87 operations across 10 core resources:
 - **Acquire Edit Lock** (`acquireLock`): Acquire or refresh an edit lock lease on a content item.
 - **Release Edit Lock** (`releaseLock`): Release the caller’s edit lock lease on a content item.
 
-### Media (11 operations)
+### Media (15 operations)
 
-- **Get Many** (`getAll`): List media files with cursor pagination and folder filtering.
-- **Get** (`get`): Get metadata for a media file by ID.
-- **Upload** (`upload`): Upload binary files directly via multipart form data.
-- **Update Metadata** (`update`): Update media title, alt text, caption, focal points, dimensions, or folder.
+- **Get Many** (`getAll`): List media files with cursor pagination, MIME type, folder filtering, and case-insensitive filename substring search (`q`). Note: `includeUsage` provides a coverage-aware usage summary; `usage.count` is `null` unless the caller holds both the RBAC `content:read_drafts` permission and `admin` token scope (use **Get Usage** for complete usage references).
+- **Get** (`get`): Get metadata for a media file by ID. Note: `includeUsage` provides a coverage-aware usage summary (`usage.count` is `null` unless caller holds both the RBAC `content:read_drafts` permission and `admin` token scope).
+- **Upload** (`upload`): Upload binary files directly via multipart form data, with optional `fieldId` allowlist targeting, pixel dimensions (`width`, `height`), and LQIP placeholder thumbnail (`thumbnailBinaryPropertyName`).
+- **Replace Image** (`replaceImage`): Replace the binary file of an existing image (`image/jpeg`, `image/png`, or `image/webp`) while preserving its ID, filename, and storage identity. Updates bytes, size, dimensions, and content hash, while invalidating and explicitly resetting `blurhash`, `dominantColor`, and `focalX`/`focalY` to `null` (does not regenerate derived metadata). Requires positive integer `width` and `height`.
+- **Get Upload Target** (`getUploadTarget`): Initiate a staged upload workflow by requesting a pre-signed or direct upload destination for a pending file (`filename`, `contentType`, `size`). When deduplication (`deduplicate: true`) is enabled and a matching checksum is found, the endpoint short-circuits the upload and immediately returns `{ existing: true, mediaId, storageKey, url }`.
+- **Upload Pending File** (`uploadPending`): Upload raw binary data directly to the staged upload URL / pending media endpoint (`PUT /media/{id}/upload`) using raw binary streaming (`Content-Type`, `Content-Length`) rather than multipart form data.
+- **Confirm Upload** (`confirmUpload`): Finalize a staged media upload (`POST /media/{id}/confirm`) after binary data has been written, optionally recording validated `size`, `width`, and `height`.
+- **Update Metadata** (`update`): Update media title, alt text, caption, focal points (`focalX` and `focalY` must be provided together between 0.0 and 1.0, or cleared via `clearFocalPoint`/null), positive integer dimensions, or folder (use "unfiled" or empty string to unfile).
 - **Delete** (`delete`): Delete a media record and associated storage file.
-- **Get Usage** (`getUsage`): Retrieve content entries referencing a media file.
+- **Get Usage** (`getUsage`): Retrieve content entries and site settings referencing a media file with cursor pagination (`cursor`, `limit`). Requires PAT scope `admin` and RBAC `media:read` + `content:read_drafts`.
 - **Get Many Folders** (`getAllFolders`): List media folders.
 - **Get Folder** (`getFolder`): Get single media folder metadata by ID.
 - **Create Folder** (`createFolder`): Create a new folder to organize media assets.
@@ -296,6 +300,48 @@ Collection, folder, and taxonomy fields use n8n resource locators. You can selec
 ### Cursor pagination
 
 List operations support EmDash opaque cursor pagination. Set **Return All** to `true` to fetch all available records automatically, or disable it and specify a custom **Limit**.
+
+### Staged and Direct Media Upload Workflows
+
+EmDash CMS supports both single-step direct uploads and multi-step staged uploads:
+
+- **Direct Upload (`upload`)**:
+  - Upload binary assets directly in one request via multipart form data (`POST /media`).
+  - Supports optional folder placement (`folderId`), duplicate checksum matching (`deduplicate: true`), automatic filename collision avoidance (`ensureUniqueFilename: true`), field allowlist enforcement (`fieldId`), explicit image dimensions (`width`, `height`), and downscaled thumbnail binary attachments (`thumbnailBinaryPropertyName`) for low-quality image placeholder (LQIP) generation.
+
+- **Staged Upload Workflow (`getUploadTarget` → `uploadPending` → `confirmUpload`)**:
+  - Recommended for large files, streaming pipelines, or decoupled architectures.
+  - **Step 1: Get Upload Target (`POST /media/upload-url`)**:
+    - Registers a pending upload with `filename`, MIME `contentType`, and file `size` in bytes (must be an integer $\ge 0$).
+    - Optional fields include `contentHash`, `fieldId`, `deduplicate`, `ensureUniqueFilename`, and `folderId` (passing `'unfiled'` or empty string places the item at root).
+    - **Deduplication short-circuit**: When `deduplicate: true` is enabled and a matching checksum is detected, the EmDash API short-circuits the upload flow and immediately returns the existing media asset:
+      <!-- prettier-ignore -->
+      ```json
+      {
+        "existing": true,
+        "mediaId": "...",
+        "storageKey": "...",
+        "url": "..."
+      }
+      ```
+      In this case, downstream **Upload Pending File** and **Confirm Upload** steps must be skipped.
+  - **Step 2: Upload Pending File (`PUT /media/{id}/upload`)**:
+    - Writes the raw file binary buffer directly to the pending media endpoint using raw binary streaming (`Content-Type` and `Content-Length` headers). Unlike direct upload, this does not wrap data in multipart form boundaries, maximizing throughput and minimizing memory overhead.
+  - **Step 3: Confirm Upload (`POST /media/{id}/confirm`)**:
+    - Finalizes the pending upload and transitions the asset to `ready` state.
+    - Optionally supplies verified `size` ($\ge 0$), `width` ($> 0$), and `height` ($> 0$) dimensions. Unconfigured dimensions are not defaulted to 0.
+
+- **Image Replacement (`replaceImage`)**:
+  - The `PUT /media/{id}/replace` endpoint replaces the binary file of an existing image asset (`image/jpeg`, `image/png`, or `image/webp`).
+  - Preserves the existing media record's ID, filename, creation timestamp, and storage key / URL identity while updating file size, width, height, and content hash.
+  - Image replacement does NOT regenerate derived image metadata: upstream explicitly invalidates and resets `blurhash` to `null`, `dominantColor` to `null`, `focalX` to `null`, and `focalY` to `null`.
+  - Requires positive integer `width` and `height` parameters. Replacement MIME type must exactly match the original item.
+
+- **Media Usage Reference Inspection (`getUsage`)**:
+  - Querying referencing content entries and site settings requires Personal Access Token scope `admin` (not `media:read`) alongside RBAC capabilities `media:read` and `content:read_drafts`.
+  - Supports cursor pagination via `cursor` and `limit` (1–100, default 50).
+  - Preserves the complete response payload (`items`, `nextCursor`, `siteSettings`, `coverage`) without auto-flattening or stripping.
+  - In **Get Many** (`getAll`) and **Get** (`get`), the `includeUsage` toggle attaches an inline usage summary; however, `usage.count` remains `null` unless the caller possesses both the RBAC `content:read_drafts` permission and the `admin` token scope (a `media:read` PAT alone cannot expose draft-derived usage counts). Dedicated media reference inspection via **Get Usage** (`GET /media/{id}/usage`) separately requires PAT scope `admin`, RBAC `media:read`, and RBAC `content:read_drafts`.
 
 ### Collaborative edit locks and concurrency control
 
