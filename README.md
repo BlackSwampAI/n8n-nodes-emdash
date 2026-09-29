@@ -1,6 +1,6 @@
 # n8n-nodes-emdash
 
-Consume and manage content, media, menus, taxonomies, search, URL redirects, comments, settings, sections, and widget areas from EmDash CMS in n8n workflows.
+Consume and manage content, media, menus, schemas, taxonomies, search, URL redirects, comments, settings, sections, and widget areas from EmDash CMS in n8n workflows.
 
 > This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
@@ -58,6 +58,10 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Taxonomy operations**: Read queries (`GET`) require `content:read`. Bulk tagging requires `content:write`. Schema mutations and term management require `taxonomies:manage` (implicitly granted by `content:write` or `admin`). (EmDash does not define `taxonomy:read` or `taxonomy:write` scopes).
 - **Search operations**: Queries and prefix suggestions require `content:read`. Administrative operations (rebuilding an index or enabling search on a collection) require `admin`. (EmDash does not define `search:read` or `search:admin` scopes).
 - **Redirect operations**: Neither `redirects:read` nor `redirects:write` exists as a PAT scope. All redirect rules and 404 access log operations require `admin` due to fail-closed middleware scope enforcement.
+- **Schema operations**:
+  - **PAT scopes**: Read queries (`GET`) require `schema:read` (or `admin`). Write and mutation operations (`POST`, `PUT`, `DELETE`) require `schema:write` (or `admin`).
+  - **RBAC permissions**: Reads require the `schema:read` capability. Schema modifications require `schema:manage` (Administrator or Developer role).
+  - **Write-only token discovery fallback**: Tokens possessing only `schema:write` can execute mutations but cannot access read endpoints used by editor `listSearch` selectors. Every collection and field resource locator provides a manual "By Slug" mode to allow workflow execution with write-only credentials.
 - **Comment moderation operations**: EmDash does not define granular `comments:*` PAT scopes (such as `comments:read` or `comments:moderate`). All comment moderation endpoints live under `/_emdash/api/admin/comments` and strictly require a Personal Access Token with the `admin` scope in combination with administrative RBAC permissions.
 - **Settings operations**:
   - **PAT scopes**: Read queries (`GET`) require `settings:read` (or `admin`). Update operations (`POST`) require `settings:manage` (or `admin`).
@@ -78,7 +82,7 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 91 operations across 10 core resources:
+The EmDash community node provides 103 operations across 11 core resources:
 
 ### Comment (6 operations)
 
@@ -155,6 +159,26 @@ The EmDash community node provides 91 operations across 10 core resources:
 - **Get 404 Summary** (`get404Summary`): Retrieve aggregation summary of top 404 error paths.
 - **Prune 404 Log** (`prune404Log`): Delete 404 error log entries older than an ISO 8601 datetime threshold.
 - **Clear All 404 Entries** (`clear404Log`): Destructively delete all recorded 404 log entries.
+
+### Schema (12 operations)
+
+- **Get Many Collections** (`getCollections`): Retrieve all collections defined in the schema.
+- **Get Collection** (`getCollection`): Retrieve a single collection schema by slug, optionally including its field definitions (`includeFields`).
+- **Create Collection** (`createCollection`): Register a new collection schema with slug, label, and optional metadata (`supports`, `admin`, `source`, `urlPattern`, `routable`, `hasSeo`, `hidden`, `sortOrder`, `editLocking`, `group`). Server defaults for `supports` are preserved when omitted.
+- **Update Collection** (`updateCollection`): Update collection schema label, metadata, comments moderation, or title/date field bindings (rejects empty updates).
+- **Delete Collection** (`deleteCollection`): Permanently deletes the collection schema and drops its underlying content table. Relations involving the collection are also removed, which cascades to bound reference fields on other collections. When content exists, deletion fails unless `force=true` is explicitly provided.
+- **Reorder Collections** (`reorderCollections`): Update admin sidebar display order of collections via an array of collection slugs. Listed collections receive explicit positions 0..N; omitted collections have explicit order cleared and sort alphabetically. Rejects unknown or duplicate slugs.
+- **Get Many Fields** (`getFields`): Retrieve all field definitions for a collection schema.
+- **Get Field** (`getField`): Retrieve a single field schema by slug within a collection.
+- **Create Field** (`createField`): Add a new field definition to a collection schema across 17 supported field types (`string`, `text`, `url`, `number`, `integer`, `boolean`, `datetime`, `select`, `multiSelect`, `portableText`, `image`, `file`, `reference`, `json`, `slug`, `repeater`, `blocks`). Field constraints (`validation`) and widget rendering options (`options`) are passed as flexible JSON objects. For new reference fields, specify `targetCollection` in the validation JSON (e.g. `{ "targetCollection": "authors" }`). Referenced block types must already exist in EmDash.
+- **Update Field** (`updateField`): Update an existing field schema's label, type, options, or validation rules (rejects empty updates). Note that target collection on an active reference field is immutable.
+- **Delete Field** (`deleteField`): Permanently deletes the field and drops its column from the content table. When `deleteRelation=true` is enabled on a reference field, it also cascades to delete the underlying relationship, all relation edges, and the field bound to the opposite side of the relation on the other collection.
+- **Reorder Fields** (`reorderFields`): Update field display ordering within a collection via an array of field slugs. Upstream assigns sequential sort orders to listed slugs; provide the complete field list for deterministic ordering.
+
+> **Caution on Schema Mutations**:
+>
+> - **Collection Deletion**: Dropping a collection is irreversible and removes the backing SQLite table and all content entries. Always test with disposable collections.
+> - **Reference Field Cascade**: Deleting a reference field with `deleteRelation=true` cascades across collection boundaries, modifying the schema of the related collection by removing the reciprocal field.
 
 ### Search (5 operations)
 
