@@ -51,7 +51,7 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Redirect operations**: Neither `redirects:read` nor `redirects:write` exists as a PAT scope. All redirect rules and 404 access log operations require `admin` due to fail-closed middleware scope enforcement.
 - **Comment moderation operations**: EmDash does not define granular `comments:*` PAT scopes (such as `comments:read` or `comments:moderate`). All comment moderation endpoints live under `/_emdash/api/admin/comments` and strictly require a Personal Access Token with the `admin` scope in combination with administrative RBAC permissions.
 - **Settings operations**:
-  - **PAT scopes**: Read queries (`GET`) require `settings:read` (or `admin`). Update operations (`PUT`) require `settings:manage` (or `admin`).
+  - **PAT scopes**: Read queries (`GET`) require `settings:read` (or `admin`). Update operations (`POST`) require `settings:manage` (or `admin`).
   - **RBAC permissions**: The authenticated user must separately possess the `settings:read` capability for reads, and `settings:manage` capability (Administrator role) for updates.
 
 ### EmDash Webhook Credential
