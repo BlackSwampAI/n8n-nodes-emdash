@@ -35,8 +35,9 @@ export async function getCollections(
 		return { results: [] };
 	}
 
-	if (filter) {
-		const lower = filter.toLowerCase();
+	const trimmedFilter = filter?.trim();
+	if (trimmedFilter) {
+		const lower = trimmedFilter.toLowerCase();
 		collections = collections.filter(
 			(col) =>
 				(col.name && col.name.toLowerCase().includes(lower)) ||

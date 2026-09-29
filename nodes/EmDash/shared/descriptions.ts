@@ -393,3 +393,79 @@ export const widgetIdProperty: INodeProperties = {
 	},
 	description: 'The unique ID of the widget',
 };
+
+export const schemaCollectionSelect: INodeProperties = {
+	displayName: 'Collection',
+	name: 'collection',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	modes: [
+		{
+			displayName: 'From List',
+			name: 'list',
+			type: 'list',
+			placeholder: 'Select a collection...',
+			typeOptions: {
+				searchListMethod: 'getCollections',
+				searchable: true,
+			},
+		},
+		{
+			displayName: 'By Slug',
+			name: 'id',
+			type: 'string',
+			placeholder: 'e.g. posts',
+		},
+	],
+	displayOptions: {
+		show: {
+			resource: ['schema'],
+			operation: [
+				'getCollection',
+				'updateCollection',
+				'deleteCollection',
+				'getFields',
+				'getField',
+				'createField',
+				'updateField',
+				'deleteField',
+				'reorderFields',
+			],
+		},
+	},
+	description: 'The slug of the EmDash collection',
+};
+
+export const schemaFieldSelect: INodeProperties = {
+	displayName: 'Field',
+	name: 'fieldSlug',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	modes: [
+		{
+			displayName: 'From List',
+			name: 'list',
+			type: 'list',
+			placeholder: 'Select a field...',
+			typeOptions: {
+				searchListMethod: 'getSchemaFields',
+				searchable: true,
+			},
+		},
+		{
+			displayName: 'By Slug',
+			name: 'id',
+			type: 'string',
+			placeholder: 'e.g. title',
+		},
+	],
+	displayOptions: {
+		show: {
+			resource: ['schema'],
+			operation: ['getField', 'updateField', 'deleteField'],
+		},
+	},
+	description: 'The slug of the collection field',
+};

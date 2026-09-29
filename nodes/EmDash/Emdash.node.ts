@@ -9,6 +9,7 @@ import { contentDescription } from './resources/content';
 import { mediaDescription } from './resources/media';
 import { menuDescription } from './resources/menu';
 import { redirectDescription } from './resources/redirect';
+import { schemaDescription } from './resources/schema';
 import { searchDescription } from './resources/search';
 import { sectionDescription } from './resources/section';
 import { settingsDescription } from './resources/settings';
@@ -17,6 +18,7 @@ import { widgetAreaDescription } from './resources/widgetArea';
 import { getCollections } from './listSearch/getCollections';
 import { getMediaFolders } from './listSearch/getMediaFolders';
 import { getMenus } from './listSearch/getMenus';
+import { getSchemaFields } from './listSearch/getSchemaFields';
 import { getSections } from './listSearch/getSections';
 import { getTaxonomies } from './listSearch/getTaxonomies';
 import { getWidgetAreas } from './listSearch/getWidgetAreas';
@@ -41,6 +43,11 @@ const resourceOptions: INodePropertyOptions[] = [
 	{
 		name: 'Redirect',
 		value: 'redirect',
+	},
+	{
+		name: 'Schema',
+		value: 'schema',
+		description: 'Manage EmDash collections and fields',
 	},
 	{
 		name: 'Search',
@@ -106,6 +113,7 @@ export class Emdash implements INodeType {
 			...mediaDescription,
 			...menuDescription,
 			...redirectDescription,
+			...schemaDescription,
 			...searchDescription,
 			...sectionDescription,
 			...settingsDescription,
@@ -119,6 +127,7 @@ export class Emdash implements INodeType {
 			getCollections,
 			getMediaFolders,
 			getMenus,
+			getSchemaFields,
 			getSections,
 			getTaxonomies,
 			getWidgetAreas,

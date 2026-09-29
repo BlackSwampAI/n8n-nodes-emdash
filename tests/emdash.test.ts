@@ -29,8 +29,21 @@ import {
 	validateJsonObject,
 	validateStringArray,
 	validateReorderWidgetIds,
+	validateCreateCollection,
+	validateUpdateCollection,
+	validateReorderCollections,
+	validateCreateField,
+	validateUpdateField,
+	validateReorderFields,
+	parseJsonParameter,
+	parseAndValidateCollectionSlugs,
+	parseAndValidateFieldSlugs,
+	SCHEMA_FIELD_TYPES,
 } from '../nodes/EmDash/shared/transport';
+import { schemaUpdateCollectionDescription } from '../nodes/EmDash/resources/schema';
+import { getCollections } from '../nodes/EmDash/listSearch/getCollections';
 import { getMenus } from '../nodes/EmDash/listSearch/getMenus';
+import { getSchemaFields } from '../nodes/EmDash/listSearch/getSchemaFields';
 import { getSections } from '../nodes/EmDash/listSearch/getSections';
 import { getWidgetAreas } from '../nodes/EmDash/listSearch/getWidgetAreas';
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
@@ -3755,17 +3768,863 @@ describe('EmDash integration tests', () => {
 		});
 	});
 
+	describe('Schema operations and preSend validation', () => {
+		describe('operation routing', () => {
+			const schemaOpProp = node.description.properties.find(
+				(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes('schema'),
+			);
+			const options = schemaOpProp?.options as INodePropertyOptions[];
+			const getOperation = (val: string) => options?.find((o) => o.value === val);
+
+			it('registers schema operation property with default getCollections', () => {
+				expect(schemaOpProp).toBeDefined();
+				expect(schemaOpProp?.default).toBe('getCollections');
+			});
+
+			it('registers all 12 schema operations with correct HTTP methods and paths', () => {
+				const expected = [
+					{ name: 'getCollections', method: 'GET', url: '/schema/collections' },
+					{
+						name: 'getCollection',
+						method: 'GET',
+						url: '=/schema/collections/{{$parameter.collection}}',
+					},
+					{ name: 'createCollection', method: 'POST', url: '/schema/collections' },
+					{
+						name: 'updateCollection',
+						method: 'PUT',
+						url: '=/schema/collections/{{$parameter.collection}}',
+					},
+					{
+						name: 'deleteCollection',
+						method: 'DELETE',
+						url: '=/schema/collections/{{$parameter.collection}}',
+					},
+					{ name: 'reorderCollections', method: 'POST', url: '/schema/collections/reorder' },
+					{
+						name: 'getFields',
+						method: 'GET',
+						url: '=/schema/collections/{{$parameter.collection}}/fields',
+					},
+					{
+						name: 'getField',
+						method: 'GET',
+						url: '=/schema/collections/{{$parameter.collection}}/fields/{{$parameter.fieldSlug}}',
+					},
+					{
+						name: 'createField',
+						method: 'POST',
+						url: '=/schema/collections/{{$parameter.collection}}/fields',
+					},
+					{
+						name: 'updateField',
+						method: 'PUT',
+						url: '=/schema/collections/{{$parameter.collection}}/fields/{{$parameter.fieldSlug}}',
+					},
+					{
+						name: 'deleteField',
+						method: 'DELETE',
+						url: '=/schema/collections/{{$parameter.collection}}/fields/{{$parameter.fieldSlug}}',
+					},
+					{
+						name: 'reorderFields',
+						method: 'POST',
+						url: '=/schema/collections/{{$parameter.collection}}/fields/reorder',
+					},
+				];
+
+				expect(options).toHaveLength(12);
+				for (const op of expected) {
+					const found = getOperation(op.name);
+					expect(found, `Operation ${op.name} should exist`).toBeDefined();
+					expect(found?.routing?.request?.method).toBe(op.method);
+					expect(found?.routing?.request?.url).toBe(op.url);
+				}
+			});
+
+			it('configures correct output unwrap for all schema operations', () => {
+				for (const listOp of ['getCollections', 'getFields']) {
+					const op = getOperation(listOp);
+					expect(op?.routing?.output?.postReceive).toEqual([
+						{ type: 'rootProperty', properties: { property: 'data.items' } },
+					]);
+				}
+
+				for (const itemOp of [
+					'getCollection',
+					'createCollection',
+					'updateCollection',
+					'getField',
+					'createField',
+					'updateField',
+				]) {
+					const op = getOperation(itemOp);
+					expect(op?.routing?.output?.postReceive).toEqual([
+						{ type: 'rootProperty', properties: { property: 'data.item' } },
+					]);
+				}
+
+				for (const dataOp of [
+					'deleteCollection',
+					'reorderCollections',
+					'deleteField',
+					'reorderFields',
+				]) {
+					const op = getOperation(dataOp);
+					expect(op?.routing?.output?.postReceive).toEqual([
+						{ type: 'rootProperty', properties: { property: 'data' } },
+					]);
+				}
+			});
+
+			it('configures preSend hooks on mutation and reorder operations', () => {
+				expect(getOperation('createCollection')?.routing?.send?.preSend).toEqual([
+					validateCreateCollection,
+				]);
+				expect(getOperation('updateCollection')?.routing?.send?.preSend).toEqual([
+					validateUpdateCollection,
+				]);
+				expect(getOperation('reorderCollections')?.routing?.send?.preSend).toEqual([
+					validateReorderCollections,
+				]);
+				expect(getOperation('createField')?.routing?.send?.preSend).toEqual([validateCreateField]);
+				expect(getOperation('updateField')?.routing?.send?.preSend).toEqual([validateUpdateField]);
+				expect(getOperation('reorderFields')?.routing?.send?.preSend).toEqual([
+					validateReorderFields,
+				]);
+			});
+
+			it('configures query parameters for getCollection, deleteCollection, and deleteField', () => {
+				const getCol = getOperation('getCollection');
+				expect(getCol?.routing?.request?.qs?.includeFields).toBe(
+					'={{$parameter.includeFields ? true : undefined}}',
+				);
+
+				const delCol = getOperation('deleteCollection');
+				expect(delCol?.routing?.request?.qs?.force).toBe(
+					'={{$parameter.force ? true : undefined}}',
+				);
+
+				const delField = getOperation('deleteField');
+				expect(delField?.routing?.request?.qs?.deleteRelation).toBe(
+					'={{$parameter.deleteRelation ? true : undefined}}',
+				);
+			});
+
+			it('provides destructive warnings on deleteCollection and deleteField', () => {
+				const delCol = getOperation('deleteCollection');
+				expect(delCol?.description).toContain(
+					'Permanently deletes the collection schema and underlying content table. Relations involving the collection are also removed. Force allows deletion when content exists.',
+				);
+
+				const delField = getOperation('deleteField');
+				expect(delField?.description).toContain(
+					'Permanently deletes the field and its column from the content table. Delete Relation also deletes the underlying relationship, all relation edges, and the field bound to the other side.',
+				);
+
+				const forceProp = node.description.properties.find((p) => p.name === 'force');
+				expect(forceProp?.description).toContain(
+					'Permanently deletes the collection schema and underlying content table. Relations involving the collection are also removed.',
+				);
+
+				const delRelationProp = node.description.properties.find(
+					(p) => p.name === 'deleteRelation',
+				);
+				expect(delRelationProp?.description).toContain(
+					'Delete Relation also deletes the underlying relationship, all relation edges, and the field bound to the other side.',
+				);
+			});
+
+			it('defines clearSortOrder in schemaUpdateCollectionDescription with type boolean and default false', () => {
+				const updateFieldsProp = schemaUpdateCollectionDescription.find(
+					(p) => p.name === 'updateFields',
+				);
+				const clearSortOrderProp = (updateFieldsProp?.options as INodeProperties[])?.find(
+					(o) => o.name === 'clearSortOrder',
+				);
+				expect(clearSortOrderProp).toBeDefined();
+				expect(clearSortOrderProp?.type).toBe('boolean');
+				expect(clearSortOrderProp?.default).toBe(false);
+			});
+		});
+
+		describe('validateCreateCollection preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('populates valid collection body with required and additional fields', async () => {
+				const ctx = createMockContext({
+					slug: 'blog_posts',
+					label: 'Blog Posts',
+					additionalFields: {
+						labelSingular: 'Blog Post',
+						description: 'Company blog articles',
+						icon: 'article',
+						supports: ['drafts', 'seo'],
+						admin: { listColumns: ['title', 'author'] },
+						source: 'manual',
+						urlPattern: '/blog/{slug}',
+						routable: true,
+						hasSeo: true,
+						hidden: false,
+						sortOrder: 1,
+						editLocking: true,
+						group: 'Content',
+					},
+				});
+
+				const result = await validateCreateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					slug: 'blog_posts',
+					label: 'Blog Posts',
+					labelSingular: 'Blog Post',
+					description: 'Company blog articles',
+					icon: 'article',
+					supports: ['drafts', 'seo'],
+					admin: { listColumns: ['title', 'author'] },
+					source: 'manual',
+					urlPattern: '/blog/{slug}',
+					routable: true,
+					hasSeo: true,
+					hidden: false,
+					sortOrder: 1,
+					editLocking: true,
+					group: 'Content',
+				});
+			});
+
+			it('rejects blank slug', async () => {
+				const ctx = createMockContext({ slug: '   ', label: 'Blog' });
+				await expect(validateCreateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/slug is required/i,
+				);
+			});
+
+			it('rejects invalid slug format', async () => {
+				const ctx = createMockContext({ slug: 'Invalid Slug!', label: 'Blog' });
+				await expect(validateCreateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/slug must start with a letter/i,
+				);
+			});
+
+			it('rejects blank label', async () => {
+				const ctx = createMockContext({ slug: 'posts', label: '   ' });
+				await expect(validateCreateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/label is required/i,
+				);
+			});
+
+			it('rejects non-integer sortOrder', async () => {
+				const ctx = createMockContext({
+					slug: 'posts',
+					label: 'Posts',
+					additionalFields: { sortOrder: 1.5 },
+				});
+				await expect(validateCreateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/sortOrder must be an integer/i,
+				);
+			});
+
+			it('rejects admin that is not an object', async () => {
+				const ctx = createMockContext({
+					slug: 'posts',
+					label: 'Posts',
+					additionalFields: { admin: '[1, 2]' },
+				});
+				await expect(validateCreateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/Admin must be a JSON object/i,
+				);
+			});
+		});
+
+		describe('validateUpdateCollection preSend', () => {
+			const req = { method: 'PUT' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('rejects empty update with descriptive error', async () => {
+				const ctx = createMockContext({ updateFields: {} });
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/At least one field must be provided to update collection/i,
+				);
+			});
+
+			it('updates provided fields correctly', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						label: 'Updated Label',
+						commentsModeration: 'first_time',
+						commentsClosedAfterDays: 14,
+						commentsAutoApproveUsers: true,
+						titleField: 'headline',
+						dateField: 'published_at',
+					},
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					label: 'Updated Label',
+					commentsModeration: 'first_time',
+					commentsClosedAfterDays: 14,
+					commentsAutoApproveUsers: true,
+					titleField: 'headline',
+					dateField: 'published_at',
+				});
+			});
+
+			it('rejects invalid commentsModeration', async () => {
+				const ctx = createMockContext({
+					updateFields: { commentsModeration: 'invalid' },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/commentsModeration must be "all", "first_time", or "none"/i,
+				);
+			});
+
+			it('rejects negative commentsClosedAfterDays', async () => {
+				const ctx = createMockContext({
+					updateFields: { commentsClosedAfterDays: -1 },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/commentsClosedAfterDays must be an integer greater than or equal to 0/i,
+				);
+			});
+
+			it('clears group with null when empty or "null"', async () => {
+				const ctx = createMockContext({
+					updateFields: { group: 'null' },
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ group: null });
+			});
+
+			it('sets sortOrder to an integer', async () => {
+				const ctx = createMockContext({
+					updateFields: { sortOrder: 5 },
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ sortOrder: 5 });
+			});
+
+			it('clears sortOrder with null when clearSortOrder is true', async () => {
+				const ctx = createMockContext({
+					updateFields: { clearSortOrder: true },
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ sortOrder: null });
+			});
+
+			it('clears sortOrder with null when sortOrder is null or "null"', async () => {
+				const ctxNull = createMockContext({
+					updateFields: { sortOrder: null },
+				});
+				const resultNull = await validateUpdateCollection.call(ctxNull as never, { ...req });
+				expect(resultNull.body).toEqual({ sortOrder: null });
+
+				const ctxNullStr = createMockContext({
+					updateFields: { sortOrder: 'null' },
+				});
+				const resultNullStr = await validateUpdateCollection.call(ctxNullStr as never, { ...req });
+				expect(resultNullStr.body).toEqual({ sortOrder: null });
+			});
+
+			it('throws when both clearSortOrder and numeric sortOrder are specified', async () => {
+				const ctx = createMockContext({
+					updateFields: { clearSortOrder: true, sortOrder: 5 },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/Cannot specify both sortOrder and clearSortOrder/i,
+				);
+			});
+
+			it('rejects non-integer sortOrder', async () => {
+				const ctx = createMockContext({
+					updateFields: { sortOrder: 3.5 },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/sortOrder must be an integer/i,
+				);
+			});
+		});
+
+		describe('validateReorderCollections preSend and parseAndValidateCollectionSlugs', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('accepts array of unique collection slugs', async () => {
+				const ctx = createMockContext({ slugs: ['posts', 'authors', 'tags'] });
+				const result = await validateReorderCollections.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ slugs: ['posts', 'authors', 'tags'] });
+			});
+
+			it('accepts JSON array string', () => {
+				expect(parseAndValidateCollectionSlugs('["posts", "authors", "tags"]')).toEqual([
+					'posts',
+					'authors',
+					'tags',
+				]);
+			});
+
+			it('accepts comma-separated string', () => {
+				expect(parseAndValidateCollectionSlugs('posts, authors, tags')).toEqual([
+					'posts',
+					'authors',
+					'tags',
+				]);
+			});
+
+			it('rejects empty input', () => {
+				expect(() => parseAndValidateCollectionSlugs('')).toThrow(
+					/At least 1 collection slug is required to reorder/i,
+				);
+				expect(() => parseAndValidateCollectionSlugs([])).toThrow(
+					/At least 1 collection slug is required to reorder/i,
+				);
+				expect(() => parseAndValidateCollectionSlugs(null)).toThrow(
+					/At least 1 collection slug is required to reorder/i,
+				);
+			});
+
+			it('rejects duplicate slugs', () => {
+				expect(() => parseAndValidateCollectionSlugs(['posts', 'tags', 'posts'])).toThrow(
+					/Duplicate collection slug found in reorder list: "posts"/i,
+				);
+			});
+
+			it('rejects blank/whitespace slug items', () => {
+				expect(() => parseAndValidateCollectionSlugs(['posts', '   '])).toThrow(
+					/cannot be empty or whitespace/i,
+				);
+			});
+		});
+
+		describe('validateCreateField preSend', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('populates valid field body with required and additional fields', async () => {
+				const ctx = createMockContext({
+					slug: 'summary',
+					label: 'Summary',
+					type: 'text',
+					additionalFields: {
+						required: true,
+						unique: false,
+						defaultValue: 'Initial summary',
+						validation: { maxLength: 500 },
+						widget: 'textarea',
+						options: { rows: 4 },
+						sortOrder: 2,
+						searchable: true,
+						indexed: false,
+						translatable: true,
+					},
+				});
+
+				const result = await validateCreateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					slug: 'summary',
+					label: 'Summary',
+					type: 'text',
+					required: true,
+					unique: false,
+					defaultValue: 'Initial summary',
+					validation: { maxLength: 500 },
+					widget: 'textarea',
+					options: { rows: 4 },
+					sortOrder: 2,
+					searchable: true,
+					indexed: false,
+					translatable: true,
+				});
+			});
+
+			it('rejects invalid field type', async () => {
+				const ctx = createMockContext({
+					slug: 'title',
+					label: 'Title',
+					type: 'unsupported_type',
+				});
+				await expect(validateCreateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/Invalid field type: "unsupported_type"/i,
+				);
+			});
+
+			it('accepts all 17 supported field types', async () => {
+				for (const type of SCHEMA_FIELD_TYPES) {
+					const ctx = createMockContext({
+						slug: 'test_field',
+						label: 'Test Field',
+						type,
+					});
+					const result = await validateCreateField.call(ctx as never, { ...req });
+					expect((result.body as Record<string, unknown>).type).toBe(type);
+				}
+			});
+
+			it('rejects blank slug', async () => {
+				const ctx = createMockContext({ slug: '   ', label: 'Title', type: 'string' });
+				await expect(validateCreateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/slug is required/i,
+				);
+			});
+
+			it('rejects invalid slug format', async () => {
+				const ctx = createMockContext({ slug: 'Invalid Field!', label: 'Title', type: 'string' });
+				await expect(validateCreateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/slug must start with a letter/i,
+				);
+			});
+
+			it('rejects blank label', async () => {
+				const ctx = createMockContext({ slug: 'title', label: '   ', type: 'string' });
+				await expect(validateCreateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/label is required/i,
+				);
+			});
+
+			it('rejects validation that is not an object or null', async () => {
+				const ctx = createMockContext({
+					slug: 'title',
+					label: 'Title',
+					type: 'string',
+					additionalFields: { validation: '[1, 2]' },
+				});
+				await expect(validateCreateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/validation must be a JSON object or null/i,
+				);
+			});
+		});
+
+		describe('validateUpdateField preSend', () => {
+			const req = { method: 'PUT' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('rejects empty update with descriptive error', async () => {
+				const ctx = createMockContext({ updateFields: {} });
+				await expect(validateUpdateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/At least one field must be provided to update field/i,
+				);
+			});
+
+			it('updates provided fields', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						label: 'New Field Label',
+						required: true,
+						searchable: true,
+					},
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					label: 'New Field Label',
+					required: true,
+					searchable: true,
+				});
+			});
+
+			it('allows setting validation and defaultValue to null', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						validation: null,
+						defaultValue: null,
+					},
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					validation: null,
+					defaultValue: null,
+				});
+			});
+
+			it('rejects invalid field type on update', async () => {
+				const ctx = createMockContext({
+					updateFields: { type: 'bogus' },
+				});
+				await expect(validateUpdateField.call(ctx as never, { ...req })).rejects.toThrow(
+					/Invalid field type: "bogus"/i,
+				);
+			});
+
+			it('trims whitespace on widget string', async () => {
+				const ctx = createMockContext({
+					updateFields: { widget: '  textarea  ' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ widget: 'textarea' });
+			});
+
+			it('preserves empty string widget to clear the widget', async () => {
+				const ctx = createMockContext({
+					updateFields: { widget: '' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ widget: '' });
+			});
+
+			it('does not set widget on body when omitted', async () => {
+				const ctx = createMockContext({
+					updateFields: { label: 'Updated Label' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect('widget' in (result.body as Record<string, unknown>)).toBe(false);
+			});
+
+			it('does not set widget on body when widget is null', async () => {
+				const ctx = createMockContext({
+					updateFields: { label: 'Updated Label', widget: null },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect('widget' in (result.body as Record<string, unknown>)).toBe(false);
+			});
+		});
+
+		describe('validateReorderFields preSend and parseAndValidateFieldSlugs', () => {
+			const req = { method: 'POST' as const, url: 'https://example.com' };
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) => {
+					if (name in params) return params[name];
+					return fallback;
+				},
+			});
+
+			it('accepts array of unique field slugs', async () => {
+				const ctx = createMockContext({ fieldSlugs: ['title', 'content', 'author'] });
+				const result = await validateReorderFields.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ fieldSlugs: ['title', 'content', 'author'] });
+			});
+
+			it('accepts JSON array string', () => {
+				expect(parseAndValidateFieldSlugs('["title", "content", "author"]')).toEqual([
+					'title',
+					'content',
+					'author',
+				]);
+			});
+
+			it('accepts comma-separated string', () => {
+				expect(parseAndValidateFieldSlugs('title, content, author')).toEqual([
+					'title',
+					'content',
+					'author',
+				]);
+			});
+
+			it('rejects empty input', () => {
+				expect(() => parseAndValidateFieldSlugs('')).toThrow(
+					/At least 1 field slug is required to reorder/i,
+				);
+				expect(() => parseAndValidateFieldSlugs([])).toThrow(
+					/At least 1 field slug is required to reorder/i,
+				);
+			});
+
+			it('rejects duplicate field slugs', () => {
+				expect(() => parseAndValidateFieldSlugs(['title', 'content', 'title'])).toThrow(
+					/Duplicate field slug found in reorder list: "title"/i,
+				);
+			});
+		});
+
+		describe('parseJsonParameter helper', () => {
+			it('parses valid JSON primitives and objects', () => {
+				expect(parseJsonParameter('{"a": 1}', 'test')).toEqual({ a: 1 });
+				expect(parseJsonParameter('[1, 2, 3]', 'test')).toEqual([1, 2, 3]);
+				expect(parseJsonParameter('true', 'test')).toBe(true);
+				expect(parseJsonParameter('123', 'test')).toBe(123);
+				expect(parseJsonParameter('null', 'test')).toBeNull();
+			});
+
+			it('returns undefined for empty strings or undefined', () => {
+				expect(parseJsonParameter('', 'test')).toBeUndefined();
+				expect(parseJsonParameter('   ', 'test')).toBeUndefined();
+				expect(parseJsonParameter(undefined, 'test')).toBeUndefined();
+			});
+
+			it('returns null for null value', () => {
+				expect(parseJsonParameter(null, 'test')).toBeNull();
+			});
+
+			it('throws descriptive error on malformed JSON', () => {
+				expect(() => parseJsonParameter('{bad json', 'admin')).toThrow(/Invalid JSON for admin:/i);
+			});
+
+			it('returns raw string when allowRawString is true and not JSON object/array', () => {
+				expect(parseJsonParameter('default_value', 'defaultValue', true)).toBe('default_value');
+			});
+		});
+
+		describe('listSearch getSchemaFields', () => {
+			it('reads collection from object locator and formats items as label (slug)', async () => {
+				const mockFields = [
+					{ slug: 'title', label: 'Post Title' },
+					{ slug: 'content', label: 'Body Content' },
+				];
+
+				let capturedUrl = '';
+				const context = {
+					getNodeParameter: (name: string) => {
+						if (name === 'collection') return { mode: 'list', value: 'posts' };
+						return undefined;
+					},
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async (
+							_cred: string,
+							options: Record<string, unknown>,
+						) => {
+							capturedUrl = options.url as string;
+							return {
+								success: true,
+								data: { items: mockFields },
+							};
+						},
+					},
+				};
+
+				const result = await getSchemaFields.call(context as never);
+				expect(capturedUrl).toContain('/schema/collections/posts/fields');
+				expect(result.results).toEqual([
+					{ name: 'Post Title (title)', value: 'title' },
+					{ name: 'Body Content (content)', value: 'content' },
+				]);
+			});
+
+			it('reads collection from string locator and falls back to slug when label is missing', async () => {
+				const mockFields = [{ slug: 'unlabeled' }];
+
+				const context = {
+					getNodeParameter: (name: string) => {
+						if (name === 'collection') return 'articles';
+						return undefined;
+					},
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockFields },
+						}),
+					},
+				};
+
+				const result = await getSchemaFields.call(context as never);
+				expect(result.results).toEqual([{ name: 'unlabeled', value: 'unlabeled' }]);
+			});
+
+			it('filters fields by search filter', async () => {
+				const mockFields = [
+					{ slug: 'title', label: 'Post Title' },
+					{ slug: 'content', label: 'Body Content' },
+				];
+
+				const context = {
+					getNodeParameter: () => 'posts',
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockFields },
+						}),
+					},
+				};
+
+				const result = await getSchemaFields.call(context as never, '  body  ');
+				expect(result.results).toEqual([{ name: 'Body Content (content)', value: 'content' }]);
+			});
+
+			it('gracefully returns empty array when collection is empty or not selected', async () => {
+				const contextEmpty = {
+					getNodeParameter: () => ({ mode: 'list', value: '' }),
+				};
+				const resultEmpty = await getSchemaFields.call(contextEmpty as never);
+				expect(resultEmpty.results).toEqual([]);
+
+				const contextThrow = {
+					getNodeParameter: () => {
+						throw new Error('Not found');
+					},
+				};
+				const resultThrow = await getSchemaFields.call(contextThrow as never);
+				expect(resultThrow.results).toEqual([]);
+			});
+
+			it('gracefully returns empty array on API error', async () => {
+				const context = {
+					getNodeParameter: () => 'posts',
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => {
+							throw new Error('Network error');
+						},
+					},
+				};
+
+				const result = await getSchemaFields.call(context as never);
+				expect(result.results).toEqual([]);
+			});
+		});
+
+		describe('listSearch getCollections filter trimming', () => {
+			it('trims whitespace from filter before filtering collections', async () => {
+				const mockCollections = [
+					{ slug: 'posts', label: 'Blog Posts' },
+					{ slug: 'authors', label: 'Authors' },
+				];
+
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async () => ({
+							success: true,
+							data: { items: mockCollections },
+						}),
+					},
+				};
+
+				const result = await getCollections.call(context as never, '  blog  ');
+				expect(result.results).toEqual([{ name: 'Blog Posts', value: 'posts' }]);
+
+				const resultWhitespace = await getCollections.call(context as never, '   ');
+				expect(resultWhitespace.results).toHaveLength(2);
+			});
+		});
+	});
+
 	describe('resource and operation counts', () => {
-		it('registers 10 resources in resource options sorted alphabetically', () => {
+		it('registers 11 resources in resource options sorted alphabetically', () => {
 			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
 			const options = resourceProp?.options as INodePropertyOptions[];
-			expect(options).toHaveLength(10);
+			expect(options).toHaveLength(11);
 			expect(options.map((opt) => opt.value)).toEqual([
 				'comment',
 				'content',
 				'media',
 				'menu',
 				'redirect',
+				'schema',
 				'search',
 				'section',
 				'settings',
@@ -3775,7 +4634,7 @@ describe('EmDash integration tests', () => {
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing operations and registers 91 total across 10 resources with 22 content operations', () => {
+		it('preserves existing operations and registers 103 total across 11 resources with 22 content operations', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -3799,6 +4658,7 @@ describe('EmDash integration tests', () => {
 			expect(countsByResource['settings']).toBe(2);
 			expect(countsByResource['section']).toBe(5);
 			expect(countsByResource['widgetArea']).toBe(8);
+			expect(countsByResource['schema']).toBe(12);
 
 			expect(
 				countsByResource['content'] +
@@ -3811,15 +4671,16 @@ describe('EmDash integration tests', () => {
 					countsByResource['settings'],
 			).toBe(78);
 
-			expect(totalOperations).toBe(91);
+			expect(totalOperations).toBe(103);
 		});
 	});
 
 	describe('listSearch methods', () => {
-		it('registers getCollections, getMediaFolders, getMenus, getSections, getTaxonomies, and getWidgetAreas', () => {
+		it('registers getCollections, getMediaFolders, getMenus, getSchemaFields, getSections, getTaxonomies, and getWidgetAreas', () => {
 			expect(node.methods?.listSearch?.getCollections).toBeDefined();
 			expect(node.methods?.listSearch?.getMediaFolders).toBeDefined();
 			expect(node.methods?.listSearch?.getMenus).toBeDefined();
+			expect(node.methods?.listSearch?.getSchemaFields).toBeDefined();
 			expect(node.methods?.listSearch?.getSections).toBeDefined();
 			expect(node.methods?.listSearch?.getTaxonomies).toBeDefined();
 			expect(node.methods?.listSearch?.getWidgetAreas).toBeDefined();

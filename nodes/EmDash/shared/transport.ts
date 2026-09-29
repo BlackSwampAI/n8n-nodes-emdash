@@ -1382,3 +1382,804 @@ export async function validateReorderWidgets(
 
 	return requestOptions;
 }
+
+export const SCHEMA_FIELD_TYPES = [
+	'string',
+	'text',
+	'url',
+	'number',
+	'integer',
+	'boolean',
+	'datetime',
+	'select',
+	'multiSelect',
+	'portableText',
+	'image',
+	'file',
+	'reference',
+	'json',
+	'slug',
+	'repeater',
+	'blocks',
+] as const;
+
+export function parseJsonParameter<T = unknown>(
+	value: unknown,
+	label = 'Parameter',
+	allowRawString = false,
+): T {
+	if (value === null || value === undefined) {
+		return value as T;
+	}
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (trimmed === '') {
+			return undefined as unknown as T;
+		}
+		let parsed: unknown;
+		let jsonError: string | undefined;
+		try {
+			parsed = JSON.parse(trimmed);
+		} catch (err) {
+			jsonError = (err as Error).message;
+		}
+		if (jsonError) {
+			if (allowRawString && !trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+				return trimmed as unknown as T;
+			}
+			throw new Error(`Invalid JSON for ${label}: ${jsonError}`);
+		}
+		return parsed as T;
+	}
+	return value as T;
+}
+
+export function parseAndValidateCollectionSlugs(value: unknown): string[] {
+	if (value === null || value === undefined) {
+		throw new Error('At least 1 collection slug is required to reorder');
+	}
+
+	let rawList: unknown[];
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			throw new Error('At least 1 collection slug is required to reorder');
+		}
+
+		if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+			let parsed: unknown;
+			let jsonError: string | undefined;
+			try {
+				parsed = JSON.parse(trimmed);
+			} catch (err) {
+				jsonError = (err as Error).message;
+			}
+			if (jsonError) {
+				throw new Error(`Invalid JSON for slugs: ${jsonError}`);
+			}
+			if (!Array.isArray(parsed)) {
+				throw new Error('slugs JSON expression must evaluate to an array');
+			}
+			rawList = parsed;
+		} else {
+			rawList = trimmed.split(',');
+		}
+	} else if (Array.isArray(value)) {
+		rawList = value;
+	} else {
+		throw new Error(`slugs must be an array or comma-separated string (received ${typeof value})`);
+	}
+
+	if (rawList.length === 0) {
+		throw new Error('At least 1 collection slug is required to reorder');
+	}
+
+	const seen = new Set<string>();
+	const result: string[] = [];
+
+	for (let i = 0; i < rawList.length; i++) {
+		const item = rawList[i];
+		if (typeof item !== 'string') {
+			throw new Error(
+				`Collection slug at index ${i} must be a non-empty string (received ${typeof item})`,
+			);
+		}
+		const trimmed = item.trim();
+		if (!trimmed) {
+			throw new Error(`Collection slug at index ${i} cannot be empty or whitespace`);
+		}
+		if (seen.has(trimmed)) {
+			throw new Error(`Duplicate collection slug found in reorder list: "${trimmed}"`);
+		}
+		seen.add(trimmed);
+		result.push(trimmed);
+	}
+
+	return result;
+}
+
+export function parseAndValidateFieldSlugs(value: unknown): string[] {
+	if (value === null || value === undefined) {
+		throw new Error('At least 1 field slug is required to reorder');
+	}
+
+	let rawList: unknown[];
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) {
+			throw new Error('At least 1 field slug is required to reorder');
+		}
+
+		if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+			let parsed: unknown;
+			let jsonError: string | undefined;
+			try {
+				parsed = JSON.parse(trimmed);
+			} catch (err) {
+				jsonError = (err as Error).message;
+			}
+			if (jsonError) {
+				throw new Error(`Invalid JSON for fieldSlugs: ${jsonError}`);
+			}
+			if (!Array.isArray(parsed)) {
+				throw new Error('fieldSlugs JSON expression must evaluate to an array');
+			}
+			rawList = parsed;
+		} else {
+			rawList = trimmed.split(',');
+		}
+	} else if (Array.isArray(value)) {
+		rawList = value;
+	} else {
+		throw new Error(
+			`fieldSlugs must be an array or comma-separated string (received ${typeof value})`,
+		);
+	}
+
+	if (rawList.length === 0) {
+		throw new Error('At least 1 field slug is required to reorder');
+	}
+
+	const seen = new Set<string>();
+	const result: string[] = [];
+
+	for (let i = 0; i < rawList.length; i++) {
+		const item = rawList[i];
+		if (typeof item !== 'string') {
+			throw new Error(
+				`Field slug at index ${i} must be a non-empty string (received ${typeof item})`,
+			);
+		}
+		const trimmed = item.trim();
+		if (!trimmed) {
+			throw new Error(`Field slug at index ${i} cannot be empty or whitespace`);
+		}
+		if (seen.has(trimmed)) {
+			throw new Error(`Duplicate field slug found in reorder list: "${trimmed}"`);
+		}
+		seen.add(trimmed);
+		result.push(trimmed);
+	}
+
+	return result;
+}
+
+export async function validateCreateCollection(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let slug = '';
+	try {
+		slug = this.getNodeParameter('slug', '') as string;
+	} catch {
+		slug = '';
+	}
+	const trimmedSlug = String(slug ?? '').trim();
+	if (!trimmedSlug) {
+		throw new Error('slug is required');
+	}
+	if (!/^[a-z][a-z0-9_]*$/.test(trimmedSlug) || trimmedSlug.length > 63) {
+		throw new Error(
+			'slug must start with a letter and contain only lowercase letters, numbers, and underscores (1–63 characters)',
+		);
+	}
+
+	let label = '';
+	try {
+		label = this.getNodeParameter('label', '') as string;
+	} catch {
+		label = '';
+	}
+	const trimmedLabel = String(label ?? '').trim();
+	if (!trimmedLabel) {
+		throw new Error('label is required');
+	}
+
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+
+	const getParam = (name: string): unknown => {
+		if (additionalFields[name] !== undefined) return additionalFields[name];
+		try {
+			return this.getNodeParameter(name);
+		} catch {
+			return undefined;
+		}
+	};
+
+	const body: Record<string, unknown> = {
+		slug: trimmedSlug,
+		label: trimmedLabel,
+	};
+
+	const labelSingular = getParam('labelSingular');
+	if (typeof labelSingular === 'string' && labelSingular.trim()) {
+		body.labelSingular = labelSingular.trim();
+	}
+
+	const description = getParam('description');
+	if (typeof description === 'string' && description.trim()) {
+		body.description = description.trim();
+	}
+
+	const icon = getParam('icon');
+	if (typeof icon === 'string' && icon.trim()) {
+		body.icon = icon.trim();
+	}
+
+	const supports = getParam('supports');
+	if (supports !== undefined && supports !== null && supports !== '') {
+		const supportsArray = validateStringArray(supports, 'Supports');
+		if (supportsArray.length > 0) {
+			body.supports = supportsArray;
+		}
+	}
+
+	const admin = getParam('admin');
+	if (admin !== undefined && admin !== null && admin !== '' && admin !== '{}') {
+		const parsedAdmin = parseJsonParameter(admin, 'Admin');
+		if (parsedAdmin !== undefined && parsedAdmin !== null) {
+			if (typeof parsedAdmin !== 'object' || Array.isArray(parsedAdmin)) {
+				throw new Error('Admin must be a JSON object');
+			}
+			body.admin = parsedAdmin;
+		}
+	}
+
+	const source = getParam('source');
+	if (typeof source === 'string' && source.trim()) {
+		body.source = source.trim();
+	}
+
+	const urlPattern = getParam('urlPattern');
+	if (typeof urlPattern === 'string' && urlPattern.trim()) {
+		body.urlPattern = urlPattern.trim();
+	}
+
+	const routable = getParam('routable');
+	if (typeof routable === 'boolean') {
+		body.routable = routable;
+	}
+
+	const hasSeo = getParam('hasSeo');
+	if (typeof hasSeo === 'boolean') {
+		body.hasSeo = hasSeo;
+	}
+
+	const hidden = getParam('hidden');
+	if (typeof hidden === 'boolean') {
+		body.hidden = hidden;
+	}
+
+	const sortOrder = getParam('sortOrder');
+	if (sortOrder !== undefined && sortOrder !== null && (sortOrder as unknown) !== '') {
+		if (typeof sortOrder !== 'number' || !Number.isInteger(sortOrder)) {
+			throw new Error('sortOrder must be an integer');
+		}
+		body.sortOrder = sortOrder;
+	}
+
+	const editLocking = getParam('editLocking');
+	if (typeof editLocking === 'boolean') {
+		body.editLocking = editLocking;
+	}
+
+	const group = getParam('group');
+	if (group !== undefined && group !== null) {
+		if (typeof group === 'string') {
+			const trimmed = group.trim();
+			body.group = trimmed === '' ? null : trimmed;
+		} else {
+			body.group = group;
+		}
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateUpdateCollection(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let updateFields: Record<string, unknown> = {};
+	try {
+		updateFields = (this.getNodeParameter('updateFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		updateFields = {};
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if ('label' in updateFields && updateFields.label !== undefined) {
+		const label = String(updateFields.label).trim();
+		if (!label) {
+			throw new Error('label cannot be empty or whitespace');
+		}
+		body.label = label;
+	}
+	if ('labelSingular' in updateFields && updateFields.labelSingular !== undefined) {
+		body.labelSingular = String(updateFields.labelSingular).trim();
+	}
+	if ('description' in updateFields && updateFields.description !== undefined) {
+		body.description = String(updateFields.description);
+	}
+	if ('icon' in updateFields && updateFields.icon !== undefined) {
+		body.icon = String(updateFields.icon).trim();
+	}
+	if (
+		'supports' in updateFields &&
+		updateFields.supports !== undefined &&
+		updateFields.supports !== null
+	) {
+		body.supports = validateStringArray(updateFields.supports, 'Supports');
+	}
+	if (
+		'admin' in updateFields &&
+		updateFields.admin !== undefined &&
+		updateFields.admin !== null &&
+		updateFields.admin !== ''
+	) {
+		const parsedAdmin = parseJsonParameter(updateFields.admin, 'Admin');
+		if (parsedAdmin !== undefined && parsedAdmin !== null) {
+			if (typeof parsedAdmin !== 'object' || Array.isArray(parsedAdmin)) {
+				throw new Error('Admin must be a JSON object');
+			}
+			body.admin = parsedAdmin;
+		}
+	}
+	if ('urlPattern' in updateFields && updateFields.urlPattern !== undefined) {
+		const val = updateFields.urlPattern;
+		if (val === null) {
+			body.urlPattern = null;
+		} else if (typeof val === 'string') {
+			const trimmed = val.trim();
+			body.urlPattern = trimmed === '' || trimmed === 'null' ? null : trimmed;
+		} else {
+			body.urlPattern = val;
+		}
+	}
+	if ('routable' in updateFields && typeof updateFields.routable === 'boolean') {
+		body.routable = updateFields.routable;
+	}
+	if ('hasSeo' in updateFields && typeof updateFields.hasSeo === 'boolean') {
+		body.hasSeo = updateFields.hasSeo;
+	}
+	if ('hidden' in updateFields && typeof updateFields.hidden === 'boolean') {
+		body.hidden = updateFields.hidden;
+	}
+	const hasSortOrder = 'sortOrder' in updateFields && updateFields.sortOrder !== undefined;
+	const clearSortOrder = updateFields.clearSortOrder === true;
+
+	if (
+		clearSortOrder &&
+		hasSortOrder &&
+		updateFields.sortOrder !== null &&
+		(updateFields.sortOrder as unknown) !== '' &&
+		(updateFields.sortOrder as unknown) !== 'null'
+	) {
+		throw new Error('Cannot specify both sortOrder and clearSortOrder');
+	}
+
+	if (clearSortOrder) {
+		body.sortOrder = null;
+	} else if (hasSortOrder) {
+		const val = updateFields.sortOrder;
+		if (val === null || (val as unknown) === 'null') {
+			body.sortOrder = null;
+		} else if ((val as unknown) !== '') {
+			if (typeof val !== 'number' || !Number.isInteger(val)) {
+				throw new Error('sortOrder must be an integer');
+			}
+			body.sortOrder = val;
+		}
+	}
+
+	if ('group' in updateFields && updateFields.group !== undefined) {
+		const val = updateFields.group;
+		if (val === null) {
+			body.group = null;
+		} else if (typeof val === 'string') {
+			const trimmed = val.trim();
+			body.group = trimmed === '' || trimmed === 'null' ? null : trimmed;
+		} else {
+			body.group = val;
+		}
+	}
+	if ('commentsEnabled' in updateFields && typeof updateFields.commentsEnabled === 'boolean') {
+		body.commentsEnabled = updateFields.commentsEnabled;
+	}
+	if (
+		'commentsModeration' in updateFields &&
+		updateFields.commentsModeration !== undefined &&
+		updateFields.commentsModeration !== ''
+	) {
+		const mod = String(updateFields.commentsModeration).trim();
+		if (!['all', 'first_time', 'none'].includes(mod)) {
+			throw new Error('commentsModeration must be "all", "first_time", or "none"');
+		}
+		body.commentsModeration = mod;
+	}
+	if (
+		'commentsClosedAfterDays' in updateFields &&
+		updateFields.commentsClosedAfterDays !== undefined &&
+		updateFields.commentsClosedAfterDays !== null &&
+		(updateFields.commentsClosedAfterDays as unknown) !== ''
+	) {
+		const days = updateFields.commentsClosedAfterDays;
+		if (typeof days !== 'number' || !Number.isInteger(days) || days < 0) {
+			throw new Error('commentsClosedAfterDays must be an integer greater than or equal to 0');
+		}
+		body.commentsClosedAfterDays = days;
+	}
+	if (
+		'commentsAutoApproveUsers' in updateFields &&
+		typeof updateFields.commentsAutoApproveUsers === 'boolean'
+	) {
+		body.commentsAutoApproveUsers = updateFields.commentsAutoApproveUsers;
+	}
+	if ('editLocking' in updateFields && typeof updateFields.editLocking === 'boolean') {
+		body.editLocking = updateFields.editLocking;
+	}
+	if ('titleField' in updateFields && updateFields.titleField !== undefined) {
+		const val = updateFields.titleField;
+		if (val === null) {
+			body.titleField = null;
+		} else if (typeof val === 'string') {
+			const trimmed = val.trim();
+			body.titleField = trimmed === '' || trimmed === 'null' ? null : trimmed;
+		} else {
+			body.titleField = val;
+		}
+	}
+	if ('dateField' in updateFields && updateFields.dateField !== undefined) {
+		const val = updateFields.dateField;
+		if (val === null) {
+			body.dateField = null;
+		} else if (typeof val === 'string') {
+			const trimmed = val.trim();
+			body.dateField = trimmed === '' || trimmed === 'null' ? null : trimmed;
+		} else {
+			body.dateField = val;
+		}
+	}
+
+	if (Object.keys(body).length === 0) {
+		throw new Error('At least one field must be provided to update collection');
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateReorderCollections(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawSlugs: unknown;
+	try {
+		rawSlugs = this.getNodeParameter('slugs', []);
+	} catch {
+		rawSlugs = [];
+	}
+
+	const validatedSlugs = parseAndValidateCollectionSlugs(rawSlugs);
+
+	requestOptions.body = {
+		slugs: validatedSlugs,
+	};
+
+	return requestOptions;
+}
+
+export async function validateCreateField(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let slug = '';
+	try {
+		slug = this.getNodeParameter('slug', '') as string;
+	} catch {
+		slug = '';
+	}
+	const trimmedSlug = String(slug ?? '').trim();
+	if (!trimmedSlug) {
+		throw new Error('slug is required');
+	}
+	if (!/^[a-z][a-z0-9_]*$/.test(trimmedSlug) || trimmedSlug.length > 63) {
+		throw new Error(
+			'slug must start with a letter and contain only lowercase letters, numbers, and underscores (1–63 characters)',
+		);
+	}
+
+	let label = '';
+	try {
+		label = this.getNodeParameter('label', '') as string;
+	} catch {
+		label = '';
+	}
+	const trimmedLabel = String(label ?? '').trim();
+	if (!trimmedLabel) {
+		throw new Error('label is required');
+	}
+
+	let type = '';
+	try {
+		type = this.getNodeParameter('type', '') as string;
+	} catch {
+		type = '';
+	}
+	const trimmedType = String(type ?? '').trim();
+	if (!trimmedType) {
+		throw new Error('type is required');
+	}
+	if (!SCHEMA_FIELD_TYPES.includes(trimmedType as (typeof SCHEMA_FIELD_TYPES)[number])) {
+		throw new Error(
+			`Invalid field type: "${trimmedType}". Must be one of: ${SCHEMA_FIELD_TYPES.join(', ')}`,
+		);
+	}
+
+	let additionalFields: Record<string, unknown> = {};
+	try {
+		additionalFields =
+			(this.getNodeParameter('additionalFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		additionalFields = {};
+	}
+
+	const getParam = (name: string): unknown => {
+		if (additionalFields[name] !== undefined) return additionalFields[name];
+		try {
+			return this.getNodeParameter(name);
+		} catch {
+			return undefined;
+		}
+	};
+
+	const body: Record<string, unknown> = {
+		slug: trimmedSlug,
+		label: trimmedLabel,
+		type: trimmedType,
+	};
+
+	const required = getParam('required');
+	if (typeof required === 'boolean') {
+		body.required = required;
+	}
+
+	const unique = getParam('unique');
+	if (typeof unique === 'boolean') {
+		body.unique = unique;
+	}
+
+	const defaultValue = getParam('defaultValue');
+	if (defaultValue !== undefined && defaultValue !== '') {
+		body.defaultValue = parseJsonParameter(defaultValue, 'defaultValue', true);
+	}
+
+	const validation = getParam('validation');
+	if (validation !== undefined && validation !== '') {
+		const parsed = parseJsonParameter(validation, 'validation');
+		if (parsed !== null && parsed !== undefined) {
+			if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+				throw new Error('validation must be a JSON object or null');
+			}
+		}
+		body.validation = parsed ?? null;
+	}
+
+	const widget = getParam('widget');
+	if (typeof widget === 'string' && widget.trim()) {
+		body.widget = widget.trim();
+	}
+
+	const options = getParam('options');
+	if (options !== undefined && options !== '' && options !== '{}') {
+		const parsed = parseJsonParameter(options, 'options');
+		if (parsed !== undefined && parsed !== null) {
+			if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+				throw new Error('options must be a JSON object');
+			}
+			body.options = parsed;
+		}
+	}
+
+	const sortOrder = getParam('sortOrder');
+	if (sortOrder !== undefined && sortOrder !== null && (sortOrder as unknown) !== '') {
+		if (typeof sortOrder !== 'number' || !Number.isInteger(sortOrder) || sortOrder < 0) {
+			throw new Error('sortOrder must be an integer greater than or equal to 0');
+		}
+		body.sortOrder = sortOrder;
+	}
+
+	const searchable = getParam('searchable');
+	if (typeof searchable === 'boolean') {
+		body.searchable = searchable;
+	}
+
+	const indexed = getParam('indexed');
+	if (typeof indexed === 'boolean') {
+		body.indexed = indexed;
+	}
+
+	const translatable = getParam('translatable');
+	if (typeof translatable === 'boolean') {
+		body.translatable = translatable;
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateUpdateField(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let updateFields: Record<string, unknown> = {};
+	try {
+		updateFields = (this.getNodeParameter('updateFields', {}) as Record<string, unknown>) || {};
+	} catch {
+		updateFields = {};
+	}
+
+	const body: Record<string, unknown> = {};
+
+	if ('label' in updateFields && updateFields.label !== undefined) {
+		const label = String(updateFields.label).trim();
+		if (!label) {
+			throw new Error('label cannot be empty or whitespace');
+		}
+		body.label = label;
+	}
+
+	if ('type' in updateFields && updateFields.type !== undefined && updateFields.type !== '') {
+		const type = String(updateFields.type).trim();
+		if (!SCHEMA_FIELD_TYPES.includes(type as (typeof SCHEMA_FIELD_TYPES)[number])) {
+			throw new Error(
+				`Invalid field type: "${type}". Must be one of: ${SCHEMA_FIELD_TYPES.join(', ')}`,
+			);
+		}
+		body.type = type;
+	}
+
+	if ('required' in updateFields && typeof updateFields.required === 'boolean') {
+		body.required = updateFields.required;
+	}
+
+	if ('unique' in updateFields && typeof updateFields.unique === 'boolean') {
+		body.unique = updateFields.unique;
+	}
+
+	if ('defaultValue' in updateFields && updateFields.defaultValue !== undefined) {
+		const val = updateFields.defaultValue;
+		if (val === null) {
+			body.defaultValue = null;
+		} else if (val === '') {
+			body.defaultValue = undefined;
+		} else {
+			body.defaultValue = parseJsonParameter(val, 'defaultValue', true);
+		}
+	}
+
+	if ('validation' in updateFields && updateFields.validation !== undefined) {
+		const val = updateFields.validation;
+		if (val === null || val === 'null') {
+			body.validation = null;
+		} else if (val === '') {
+			body.validation = null;
+		} else {
+			const parsed = parseJsonParameter(val, 'validation');
+			if (parsed !== null && parsed !== undefined) {
+				if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+					throw new Error('validation must be a JSON object or null');
+				}
+			}
+			body.validation = parsed ?? null;
+		}
+	}
+
+	if (
+		'widget' in updateFields &&
+		updateFields.widget !== undefined &&
+		updateFields.widget !== null
+	) {
+		const trimmed = String(updateFields.widget).trim();
+		body.widget = trimmed;
+	}
+
+	if (
+		'options' in updateFields &&
+		updateFields.options !== undefined &&
+		updateFields.options !== ''
+	) {
+		const val = updateFields.options;
+		if (val === null || val === 'null') {
+			body.options = undefined;
+		} else {
+			const parsed = parseJsonParameter(val, 'options');
+			if (parsed !== undefined && parsed !== null) {
+				if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+					throw new Error('options must be a JSON object');
+				}
+				body.options = parsed;
+			}
+		}
+	}
+
+	if (
+		'sortOrder' in updateFields &&
+		updateFields.sortOrder !== undefined &&
+		updateFields.sortOrder !== null &&
+		(updateFields.sortOrder as unknown) !== ''
+	) {
+		const val = updateFields.sortOrder;
+		if (typeof val !== 'number' || !Number.isInteger(val) || val < 0) {
+			throw new Error('sortOrder must be an integer greater than or equal to 0');
+		}
+		body.sortOrder = val;
+	}
+
+	if ('searchable' in updateFields && typeof updateFields.searchable === 'boolean') {
+		body.searchable = updateFields.searchable;
+	}
+
+	if ('indexed' in updateFields && typeof updateFields.indexed === 'boolean') {
+		body.indexed = updateFields.indexed;
+	}
+
+	if ('translatable' in updateFields && typeof updateFields.translatable === 'boolean') {
+		body.translatable = updateFields.translatable;
+	}
+
+	if (Object.keys(body).length === 0) {
+		throw new Error('At least one field must be provided to update field');
+	}
+
+	requestOptions.body = body;
+	return requestOptions;
+}
+
+export async function validateReorderFields(
+	this: IExecuteSingleFunctions,
+	requestOptions: IHttpRequestOptions,
+): Promise<IHttpRequestOptions> {
+	let rawSlugs: unknown;
+	try {
+		rawSlugs = this.getNodeParameter('fieldSlugs', []);
+	} catch {
+		rawSlugs = [];
+	}
+
+	const validatedSlugs = parseAndValidateFieldSlugs(rawSlugs);
+
+	requestOptions.body = {
+		fieldSlugs: validatedSlugs,
+	};
+
+	return requestOptions;
+}

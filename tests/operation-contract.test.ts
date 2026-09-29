@@ -640,6 +640,114 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Schema Get Many Collections: requires no controls
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'getCollections',
+				requiredControls: [],
+			}),
+		).not.toThrow();
+
+		// Schema Get Collection: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'getCollection',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Schema Create Collection: requires slug and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'createCollection',
+				requiredControls: ['slug', 'label'],
+			}),
+		).not.toThrow();
+
+		// Schema Update Collection: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'updateCollection',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Schema Delete Collection: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'deleteCollection',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Schema Reorder Collections: requires slugs
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'reorderCollections',
+				requiredControls: ['slugs'],
+			}),
+		).not.toThrow();
+
+		// Schema Get Many Fields: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'getFields',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Schema Get Field: requires collection and fieldSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'getField',
+				requiredControls: ['collection', 'fieldSlug'],
+			}),
+		).not.toThrow();
+
+		// Schema Create Field: requires collection, slug, label, and type
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'createField',
+				requiredControls: ['collection', 'slug', 'label', 'type'],
+			}),
+		).not.toThrow();
+
+		// Schema Update Field: requires collection and fieldSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'updateField',
+				requiredControls: ['collection', 'fieldSlug'],
+			}),
+		).not.toThrow();
+
+		// Schema Delete Field: requires collection and fieldSlug
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'deleteField',
+				requiredControls: ['collection', 'fieldSlug'],
+			}),
+		).not.toThrow();
+
+		// Schema Reorder Fields: requires collection and fieldSlugs
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'schema',
+				operation: 'reorderFields',
+				requiredControls: ['collection', 'fieldSlugs'],
+			}),
+		).not.toThrow();
+
 		const collection = description.properties.find(({ name }) => name === 'collection');
 		expect(collection?.required).toBe(true);
 		expect(collection?.displayOptions?.show).toEqual({
@@ -733,6 +841,22 @@ describe('EmDash node operation contracts', () => {
 		expect(widgetId?.required).toBe(true);
 		expect(widgetId?.displayOptions?.show?.resource).toEqual(['widgetArea']);
 		expect(widgetId?.displayOptions?.show?.operation).toEqual(['updateWidget', 'deleteWidget']);
+
+		const schemaCollection = description.properties.find(
+			({ name, displayOptions }) =>
+				name === 'collection' && displayOptions?.show?.resource?.includes('schema'),
+		);
+		expect(schemaCollection?.required).toBe(true);
+		expect(schemaCollection?.displayOptions?.show?.resource).toEqual(['schema']);
+
+		const schemaField = description.properties.find(({ name }) => name === 'fieldSlug');
+		expect(schemaField?.required).toBe(true);
+		expect(schemaField?.displayOptions?.show?.resource).toEqual(['schema']);
+		expect(schemaField?.displayOptions?.show?.operation).toEqual([
+			'getField',
+			'updateField',
+			'deleteField',
+		]);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {
