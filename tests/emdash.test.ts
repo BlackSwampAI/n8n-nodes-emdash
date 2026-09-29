@@ -1846,7 +1846,17 @@ describe('EmDash integration tests', () => {
 
 			const updateOp = getOperation('update');
 			expect(updateOp, 'Operation update should exist').toBeDefined();
-			expect(updateOp?.routing?.request?.method).toBe('PUT');
+			expect(updateOp?.routing?.request?.method).toBe('POST');
+			expect(updateOp?.routing?.request?.url).toBe('/settings');
+		});
+
+		it('intentionally routes update operation with POST for EmDash 1.0.1 runtime compatibility despite OpenAPI PUT definition', () => {
+			// Generated OpenAPI contract (packages/core/src/api/openapi/document.ts) specifies PUT /_emdash/api/settings (updateSettings).
+			// However, actual EmDash 1.0.1 route implementation (packages/core/src/astro/routes/api/settings.ts) exports only GET and POST handlers,
+			// and first-party admin client (packages/admin/src/lib/api/settings.ts) dispatches POST /settings.
+			// Node intentionally wires POST to ensure reliable runtime execution with upstream EmDash 1.0.1.
+			const updateOp = getOperation('update');
+			expect(updateOp?.routing?.request?.method).toBe('POST');
 			expect(updateOp?.routing?.request?.url).toBe('/settings');
 		});
 
@@ -1943,7 +1953,7 @@ describe('EmDash integration tests', () => {
 			});
 
 			it('executes preSend hook and sets requestOptions.body to validated settings', async () => {
-				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				const req = { method: 'POST' as const, url: 'https://example.com' };
 				const settings = { title: 'My Blog', tagline: 'A blog' };
 				const result = await validateUpdateSettings.call(createMockContext({ settings }) as never, {
 					...req,
@@ -1952,7 +1962,7 @@ describe('EmDash integration tests', () => {
 			});
 
 			it('executes preSend hook with JSON string and sets requestOptions.body to parsed settings object', async () => {
-				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				const req = { method: 'POST' as const, url: 'https://example.com' };
 				const settings = '{"title":"Parsed Title","featureFlags":{"beta":true}}';
 				const result = await validateUpdateSettings.call(createMockContext({ settings }) as never, {
 					...req,
@@ -1964,7 +1974,7 @@ describe('EmDash integration tests', () => {
 			});
 
 			it('preSend hook rejects invalid settings input with informative error', async () => {
-				const req = { method: 'PUT' as const, url: 'https://example.com' };
+				const req = { method: 'POST' as const, url: 'https://example.com' };
 				await expect(
 					validateUpdateSettings.call(createMockContext({ settings: null }) as never, { ...req }),
 				).rejects.toThrow(/must be an object/i);

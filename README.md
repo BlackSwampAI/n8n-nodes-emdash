@@ -155,7 +155,7 @@ The EmDash community node provides 68 operations across 8 core resources:
 ### Settings (2 operations)
 
 - **Get** (`get`): Retrieve current site settings object directly from the CMS without static schema constraints.
-- **Update** (`update`): Update site settings with a validated JSON object or expression while preserving arbitrary custom and future settings fields.
+- **Update** (`update`): Update site settings with a validated JSON object or expression via `POST /settings` (merges updates with existing settings; unspecified settings remain unchanged).
 
 ## Trigger
 
@@ -257,9 +257,10 @@ A common content automation scenario involves publishing a promotional landing p
 The Settings resource provides direct access to site-wide configuration stored in EmDash CMS:
 
 - **Get Settings** (`get`): Fetches the full settings object. The response envelope is automatically unwrapped to return the raw settings data.
-- **Update Settings** (`update`): Updates site settings by sending a validated JSON payload.
-- **Dynamic JSON structure**: EmDash settings evolve upstream across CMS releases, plugins, and custom extensions. Rather than constraining settings to a static, brittle schema, the node accepts a dynamic JSON object or expression and preserves arbitrary existing, custom, and future configuration fields.
-- **Safe update practices**: Because `PUT /settings` replaces or merges settings at the CMS level, avoid accidentally overwriting unknown or plugin-managed configuration keys. A recommended pattern is to first call **Get Settings**, modify or merge the targeted properties in an n8n **Code** or **Set** node, and then pass the merged object to **Update Settings**. Always export or take backups of your settings prior to broad updates.
+- **Update Settings** (`update`): Updates site settings by sending a validated JSON payload via `POST /settings`.
+- **Merge semantics**: EmDash merges submitted settings with existing configuration; unspecified fields remain untouched, so workflows can submit partial settings objects containing only the targeted updates.
+- **Dynamic JSON input and schema behavior**: The n8n node parameter accepts a flexible JSON object or expression for forward compatibility. Note that current upstream EmDash 1.0.1 parses update payloads with a finite Zod schema (`settingsUpdateBody`) that strips unknown properties; arbitrary custom keys are not persisted by EmDash 1.0.1, though future CMS releases may accept additional fields without requiring node UI changes.
+- **Best practices**: While partial updates do not overwrite omitted settings, calling **Get Settings** first can be useful when reviewing current values or computing dynamic property updates. Backups or exporting settings prior to broad configuration changes are always recommended.
 - **Authentication and permissions**:
   - **Personal Access Token (PAT) Scopes**: Reading settings via `Get` requires `settings:read` (or `admin`). Modifying settings via `Update` requires `settings:manage` (or `admin`).
   - **RBAC Capabilities**: The authenticated user account must possess the corresponding internal RBAC permission (`settings:read` capability for reads; `settings:manage` capability, typical of the Administrator role, for updates).

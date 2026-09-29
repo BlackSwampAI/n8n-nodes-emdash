@@ -46,7 +46,12 @@ export const settingsDescription: INodeProperties[] = [
 				description: 'Update site settings with a JSON object',
 				routing: {
 					request: {
-						method: 'PUT',
+						// Note: Upstream OpenAPI (packages/core/src/api/openapi/document.ts) specifies PUT /_emdash/api/settings (updateSettings).
+						// However, the actual EmDash route implementation (packages/core/src/astro/routes/api/settings.ts) only exports
+						// GET and POST handlers (POST /_emdash/api/settings - Update site settings), and EmDash's first-party admin client
+						// (packages/admin/src/lib/api/settings.ts) calls POST /settings.
+						// Therefore, POST /settings is intentionally used for runtime compatibility with EmDash 1.0.1.
+						method: 'POST',
 						url: '/settings',
 					},
 					send: {
