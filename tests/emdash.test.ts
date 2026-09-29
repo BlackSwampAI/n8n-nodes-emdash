@@ -870,6 +870,26 @@ describe('EmDash integration tests', () => {
 				prepareMediaReplacement.call(createMock(100, 33.3) as never, { method: 'PUT', url: '' }),
 			).rejects.toThrow('Height must be an integer greater than 0');
 		});
+
+		it('documents that image replacement resets derived metadata (blurhash, dominantColor, focal points)', () => {
+			const mediaOpProp = node.description.properties.find(
+				(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes('media'),
+			);
+			const options = mediaOpProp?.options as INodePropertyOptions[];
+			const replaceOp = options.find((o) => o.value === 'replaceImage');
+			expect(replaceOp?.description).toContain(
+				'resets blurhash, dominant color, and focal points to null',
+			);
+
+			const binaryProp = node.description.properties.find(
+				(p) =>
+					p.name === 'binaryPropertyName' &&
+					p.displayOptions?.show?.operation?.includes('replaceImage'),
+			);
+			expect(binaryProp?.description).toContain(
+				'resets blurhash, dominantColor, and focal point to null',
+			);
+		});
 	});
 
 	describe('get upload target preSend hook implementation', () => {

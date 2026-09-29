@@ -270,7 +270,7 @@ export const mediaDescription: INodeProperties[] = [
 				value: 'replaceImage',
 				action: 'Replace a media image file',
 				description:
-					'Replace the binary file of an existing image while preserving its ID and storage identity',
+					'Replace the binary file of an existing image while preserving its ID and storage identity (resets blurhash, dominant color, and focal points to null)',
 				routing: {
 					request: {
 						method: 'PUT',

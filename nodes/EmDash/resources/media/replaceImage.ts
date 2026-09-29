@@ -15,7 +15,8 @@ export const mediaReplaceImageDescription: INodeProperties[] = [
 		displayOptions: {
 			show: showOnlyForMediaReplaceImage,
 		},
-		description: 'The name of the binary property containing the replacement image file',
+		description:
+			'The name of the binary property containing the replacement image file. Preserves media ID and storage identity, updates dimensions and content hash, and resets blurhash, dominantColor, and focal point to null.',
 	},
 	{
 		displayName: 'Width',
