@@ -2,11 +2,13 @@ import { NodeConnectionTypes, type INodeType, type INodeTypeDescription } from '
 import { commentDescription } from './resources/comment';
 import { contentDescription } from './resources/content';
 import { mediaDescription } from './resources/media';
+import { menuDescription } from './resources/menu';
 import { redirectDescription } from './resources/redirect';
 import { searchDescription } from './resources/search';
 import { taxonomyDescription } from './resources/taxonomy';
 import { getCollections } from './listSearch/getCollections';
 import { getMediaFolders } from './listSearch/getMediaFolders';
+import { getMenus } from './listSearch/getMenus';
 import { getTaxonomies } from './listSearch/getTaxonomies';
 
 export class Emdash implements INodeType {
@@ -57,6 +59,10 @@ export class Emdash implements INodeType {
 						value: 'media',
 					},
 					{
+						name: 'Menu',
+						value: 'menu',
+					},
+					{
 						name: 'Redirect',
 						value: 'redirect',
 					},
@@ -74,6 +80,7 @@ export class Emdash implements INodeType {
 			...commentDescription,
 			...contentDescription,
 			...mediaDescription,
+			...menuDescription,
 			...redirectDescription,
 			...searchDescription,
 			...taxonomyDescription,
@@ -84,6 +91,7 @@ export class Emdash implements INodeType {
 		listSearch: {
 			getCollections,
 			getMediaFolders,
+			getMenus,
 			getTaxonomies,
 		},
 	};
