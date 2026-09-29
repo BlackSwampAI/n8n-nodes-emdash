@@ -303,9 +303,9 @@ EmDash provides dual-layer write protection to prevent conflicting edits in mult
 
 - **Collaborative edit locks**:
   - Edit locks coordinate active editing sessions between users and automated workflows to prevent accidental overwrites during active authoring.
-  - Locks operate on a lease duration (typically 5 minutes in EmDash CMS) and expire automatically if not actively renewed. Calling **Content → Acquire Edit Lock** on an item already locked by the caller refreshes this lease duration.
+  - Locks currently use a 7-minute lease in EmDash 1.0.1 and expire automatically unless refreshed. Calling **Content → Acquire Edit Lock** on an item already locked by the caller refreshes this lease duration.
   - **Session tokens (`token`)**: Specify an optional caller session token (up to 128 characters) when acquiring an edit lock. When releasing the lock via **Content → Release Edit Lock**, supplying the same token ensures that one workflow session does not inadvertently release a lock another session still relies on.
-  - **Takeover risk (`takeover: true`)**: Enabling takeover on **Acquire Edit Lock** allows callers with sufficient RBAC permissions (`content:edit_any`) to seize an active edit lock from another editor. Use this with caution: breaking an active lease will disrupt the current editor's in-flight work.
+  - **Takeover risk (`takeover: true`)**: Callers must already be authorized to edit the entry (owned content may be authorized through `content:edit_own`, while other content requires `content:edit_any`). Once authorized, enabling `takeover: true` allows the caller to replace the active lock holder. Use this with caution: breaking an active lease will disrupt the current editor's in-flight work.
 - **Relationship between edit locks and `_rev`**:
   - Edit locks coordinate collaborative presence and in-flight sessions; `_rev` revision tokens provide optimistic concurrency control at write/commit time.
   - Neither replaces the other: holding an edit lock does not eliminate the need for `_rev` checks during updates, and supplying `_rev` does not bypass an edit lock held by another editor unless `overrideLock: true` is explicitly provided. Workflows should use edit locks to coordinate long-running editorial tasks and pass `_rev` to guarantee data integrity against stale writes.
