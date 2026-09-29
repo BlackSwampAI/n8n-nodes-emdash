@@ -1,6 +1,6 @@
 # n8n-nodes-emdash
 
-Consume and manage content, media, taxonomies, search, and URL redirects from EmDash CMS in n8n workflows.
+Consume and manage content, media, taxonomies, search, URL redirects, and comments from EmDash CMS in n8n workflows.
 
 > This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
@@ -46,6 +46,7 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Taxonomy operations**: Read queries (`GET`) require `content:read`. Bulk tagging requires `content:write`. Schema mutations and term management require `taxonomies:manage` (implicitly granted by `content:write` or `admin`). (EmDash does not define `taxonomy:read` or `taxonomy:write` scopes).
 - **Search operations**: Queries and prefix suggestions require `content:read`. Administrative operations (rebuilding an index or enabling search on a collection) require `admin`. (EmDash does not define `search:read` or `search:admin` scopes).
 - **Redirect operations**: Neither `redirects:read` nor `redirects:write` exists as a PAT scope. All redirect rules and 404 access log operations require `admin` due to fail-closed middleware scope enforcement.
+- **Comment moderation operations**: EmDash does not define granular `comments:*` PAT scopes (such as `comments:read` or `comments:moderate`). All comment moderation endpoints live under `/_emdash/api/admin/comments` and strictly require a Personal Access Token with the `admin` scope in combination with administrative RBAC permissions.
 
 ### EmDash Webhook Credential
 
@@ -56,7 +57,16 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 51 operations across 5 core resources:
+The EmDash community node provides 57 operations across 6 core resources:
+
+### Comment (6 operations)
+
+- **Get Many** (`getAll`): Retrieve comments with cursor pagination and status, collection, and search filters.
+- **Get Counts** (`getCounts`): Retrieve comment counts grouped by moderation status (`pending`, `approved`, `spam`, `trash`).
+- **Get** (`get`): Retrieve a single comment by ID including author metadata, IP hash, and status.
+- **Update Status** (`updateStatus`): Update the moderation status of a comment (`approved`, `pending`, `spam`, `trash`).
+- **Bulk Action** (`bulkAction`): Apply moderation action (`approve`, `spam`, `trash`) or permanently delete up to 100 comments in a single request.
+- **Delete** (`delete`): Permanently delete a comment by ID (irreversible).
 
 ### Content (16 operations)
 
@@ -178,6 +188,14 @@ List operations support EmDash opaque cursor pagination. Set **Return All** to `
 ### Concurrency control
 
 EmDash employs optimistic locking for draft updates and publication actions. Content operations return a revision token (`_rev`). When performing automated updates, pass the current `_rev` to avoid conflicting with concurrent editor changes.
+
+### Comment moderation and privacy
+
+Comment records returned by moderation endpoints contain commenter personal information, including author email (`authorEmail`) and cryptographic IP hash (`ipHash`). Workflows that process or forward comment outputs to notification channels, logs, or external systems should handle and redact these fields appropriately in accordance with organizational privacy standards.
+
+### Automated comment moderation workflows
+
+The `@emdash-cms/plugin-webhook-notifier` plugin does not currently emit webhook events for comment submission or status transitions. To automate comment moderation workflows (such as AI content analysis, automated spam detection, or alerts), configure an n8n workflow using the **Schedule Trigger** node to periodically poll **Comment → Get Many** filtered by `status: pending`.
 
 ## Troubleshooting
 

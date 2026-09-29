@@ -8,8 +8,10 @@ import {
 	unwrapEnvelope,
 	cursorPaginationOperations,
 	prepareMediaUpload,
+	parseAndValidateCommentIds,
+	validateBulkCommentAction,
 } from '../nodes/EmDash/shared/transport';
-import type { INodePropertyOptions } from 'n8n-workflow';
+import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
 describe('EmDash integration tests', () => {
 	const node = new EmDash();
@@ -905,6 +907,419 @@ describe('EmDash integration tests', () => {
 				'updateRedirect',
 				'deleteRedirect',
 			]);
+		});
+	});
+
+	describe('comment moderation operation routing', () => {
+		const commentOpProp = node.description.properties.find(
+			(p) => p.name === 'operation' && p.displayOptions?.show?.resource?.includes('comment'),
+		);
+		const options = commentOpProp?.options as INodePropertyOptions[];
+		const getOperation = (val: string) => options?.find((o) => o.value === val);
+
+		it('registers Comment operation property with default getAll', () => {
+			expect(commentOpProp).toBeDefined();
+			expect(commentOpProp?.default).toBe('getAll');
+			expect(options).toHaveLength(6);
+		});
+
+		const expectedOperations = [
+			{
+				name: 'getAll',
+				method: 'GET',
+				url: '/admin/comments',
+				postReceiveProp: 'data.items',
+			},
+			{
+				name: 'getCounts',
+				method: 'GET',
+				url: '/admin/comments/counts',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'get',
+				method: 'GET',
+				url: '=/admin/comments/{{$parameter.commentId}}',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'updateStatus',
+				method: 'PUT',
+				url: '=/admin/comments/{{$parameter.commentId}}/status',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'bulkAction',
+				method: 'POST',
+				url: '/admin/comments/bulk',
+				postReceiveProp: 'data',
+			},
+			{
+				name: 'delete',
+				method: 'DELETE',
+				url: '=/admin/comments/{{$parameter.commentId}}',
+				postReceiveProp: 'data',
+			},
+		];
+
+		it('registers all 6 comment operations with correct HTTP methods and paths', () => {
+			for (const expected of expectedOperations) {
+				const op = getOperation(expected.name);
+				expect(op, `Operation ${expected.name} should exist`).toBeDefined();
+				expect(op?.routing?.request?.method).toBe(expected.method);
+				expect(op?.routing?.request?.url).toBe(expected.url);
+			}
+		});
+
+		it('unwraps data.items for getAll and data for other comment operations', () => {
+			for (const expected of expectedOperations) {
+				const op = getOperation(expected.name);
+				expect(op?.routing?.output?.postReceive).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: expected.postReceiveProp,
+						},
+					},
+				]);
+			}
+		});
+
+		it('configures bulkAction operation with validateBulkCommentAction preSend hook', () => {
+			const bulkAction = getOperation('bulkAction');
+			expect(bulkAction?.routing?.send?.preSend).toEqual([validateBulkCommentAction]);
+		});
+
+		it('configures cursor pagination and returnAll logic for comment getAll', () => {
+			const commentReturnAll = node.description.properties.find(
+				(p) =>
+					p.name === 'returnAll' &&
+					p.displayOptions?.show?.resource?.includes('comment') &&
+					p.displayOptions?.show?.operation?.includes('getAll'),
+			);
+			expect(commentReturnAll?.routing?.send?.paginate).toBe('={{ $value }}');
+			expect(commentReturnAll?.routing?.send?.property).toBe('limit');
+			expect(commentReturnAll?.routing?.send?.value).toBe('100');
+			expect(commentReturnAll?.routing?.operations?.pagination).toEqual(
+				cursorPaginationOperations.pagination,
+			);
+
+			const commentLimit = node.description.properties.find(
+				(p) =>
+					p.name === 'limit' &&
+					p.displayOptions?.show?.resource?.includes('comment') &&
+					p.displayOptions?.show?.operation?.includes('getAll'),
+			);
+			expect(commentLimit?.default).toBe(50);
+			expect(commentLimit?.typeOptions?.minValue).toBe(1);
+			expect(commentLimit?.typeOptions?.maxValue).toBe(100);
+			expect(commentLimit?.routing?.send?.property).toBe('limit');
+			expect(commentLimit?.routing?.output?.maxResults).toBe('={{$value}}');
+		});
+
+		it('configures comment getAll filters (collection, status, search)', () => {
+			const filters = node.description.properties.find(
+				(p) =>
+					p.name === 'filters' &&
+					p.displayOptions?.show?.resource?.includes('comment') &&
+					p.displayOptions?.show?.operation?.includes('getAll'),
+			);
+			expect(filters).toBeDefined();
+			const filterOptions = filters?.options as INodeProperties[];
+			expect(filterOptions).toBeDefined();
+
+			const collectionFilter = filterOptions.find((f) => f.name === 'collection');
+			expect(collectionFilter).toBeDefined();
+			expect(collectionFilter?.type).toBe('resourceLocator');
+			expect(collectionFilter?.modes).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ name: 'list' }),
+					expect.objectContaining({ name: 'id' }),
+				]),
+			);
+			expect(collectionFilter?.routing?.request?.qs?.collection).toBeDefined();
+
+			const statusFilter = filterOptions.find((f) => f.name === 'status');
+			expect(statusFilter).toBeDefined();
+			expect(statusFilter?.type).toBe('options');
+			expect(statusFilter?.default).toBe('any');
+			const statusOpts = (statusFilter?.options as Array<{ name: string; value: string }>).map(
+				(o) => o.value,
+			);
+			expect(statusOpts).toEqual(['any', 'approved', 'pending', 'spam', 'trash']);
+			expect(statusFilter?.routing?.request?.qs?.status).toBeDefined();
+
+			const searchFilter = filterOptions.find((f) => f.name === 'search');
+			expect(searchFilter).toBeDefined();
+			expect(searchFilter?.type).toBe('string');
+			expect(searchFilter?.routing?.request?.qs?.search).toBeDefined();
+		});
+
+		it('configures updateStatus status parameter options', () => {
+			const statusProp = node.description.properties.find(
+				(p) =>
+					p.name === 'status' &&
+					p.displayOptions?.show?.resource?.includes('comment') &&
+					p.displayOptions?.show?.operation?.includes('updateStatus'),
+			);
+			expect(statusProp?.required).toBe(true);
+			expect(statusProp?.default).toBe('approved');
+			const statusOpts = (statusProp?.options as Array<{ name: string; value: string }>).map(
+				(o) => o.value,
+			);
+			expect(statusOpts).toEqual(['approved', 'pending', 'spam', 'trash']);
+			expect(statusProp?.routing?.send?.type).toBe('body');
+			expect(statusProp?.routing?.send?.property).toBe('status');
+		});
+
+		it('wires commentId property with required flag for get, updateStatus, delete', () => {
+			const commentId = node.description.properties.find((p) => p.name === 'commentId');
+			expect(commentId?.required).toBe(true);
+			expect(commentId?.displayOptions?.show?.resource).toEqual(['comment']);
+			expect(commentId?.displayOptions?.show?.operation).toEqual(['get', 'updateStatus', 'delete']);
+		});
+	});
+
+	describe('parseAndValidateCommentIds and validateBulkCommentAction', () => {
+		describe('parseAndValidateCommentIds', () => {
+			it('rejects empty array, blank string, and null/undefined', () => {
+				expect(() => parseAndValidateCommentIds([])).toThrow('At least 1 comment ID is required');
+				expect(() => parseAndValidateCommentIds('')).toThrow('At least 1 comment ID is required');
+				expect(() => parseAndValidateCommentIds('   ')).toThrow(
+					'At least 1 comment ID is required',
+				);
+				expect(() => parseAndValidateCommentIds(null)).toThrow('At least 1 comment ID is required');
+				expect(() => parseAndValidateCommentIds(undefined)).toThrow(
+					'At least 1 comment ID is required',
+				);
+			});
+
+			it('rejects more than 100 IDs', () => {
+				const ids101 = Array.from({ length: 101 }, (_, i) => `cmt_${i + 1}`);
+				expect(() => parseAndValidateCommentIds(ids101)).toThrow(
+					/Cannot process more than 100 comment IDs/,
+				);
+				expect(() => parseAndValidateCommentIds(ids101.join(','))).toThrow(
+					/Cannot process more than 100 comment IDs/,
+				);
+			});
+
+			it('rejects blank/whitespace items within list', () => {
+				expect(() => parseAndValidateCommentIds(['cmt_1', '', 'cmt_2'])).toThrow(
+					'Comment ID cannot be empty or whitespace',
+				);
+				expect(() => parseAndValidateCommentIds(['cmt_1', '   ', 'cmt_2'])).toThrow(
+					'Comment ID cannot be empty or whitespace',
+				);
+				expect(() => parseAndValidateCommentIds('cmt_1,  , cmt_2')).toThrow(
+					'Comment ID cannot be empty or whitespace',
+				);
+				expect(() => parseAndValidateCommentIds('cmt_1,')).toThrow(
+					'Comment ID cannot be empty or whitespace',
+				);
+			});
+
+			it('parses comma-separated, JSON array, and native array correctly', () => {
+				expect(parseAndValidateCommentIds('cmt_1, cmt_2, cmt_3')).toEqual([
+					'cmt_1',
+					'cmt_2',
+					'cmt_3',
+				]);
+				expect(parseAndValidateCommentIds('["cmt_1", "cmt_2", "cmt_3"]')).toEqual([
+					'cmt_1',
+					'cmt_2',
+					'cmt_3',
+				]);
+				expect(parseAndValidateCommentIds([' cmt_1 ', 'cmt_2 '])).toEqual(['cmt_1', 'cmt_2']);
+				expect(parseAndValidateCommentIds(' cmt_single ')).toEqual(['cmt_single']);
+			});
+
+			it('rejects non-string inputs such as numbers, objects, and booleans', () => {
+				expect(() => parseAndValidateCommentIds(123)).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+				expect(() => parseAndValidateCommentIds({ id: 'cmt_1' })).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+				expect(() => parseAndValidateCommentIds(true)).toThrow(
+					'Comment IDs must be an array, comma-separated string, or JSON array string',
+				);
+			});
+
+			it('rejects non-string elements inside an array', () => {
+				expect(() => parseAndValidateCommentIds([123])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds(['cmt_1', 123])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds([null])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+				expect(() => parseAndValidateCommentIds([{}])).toThrow(
+					'Comment ID must be a non-empty string',
+				);
+			});
+		});
+
+		describe('validateBulkCommentAction preSend hook', () => {
+			const createMockContext = (params: Record<string, unknown>) => ({
+				getNodeParameter: (name: string, fallback?: unknown) =>
+					params[name] !== undefined ? params[name] : fallback,
+			});
+
+			it('rejects empty array or blank string', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: '', action: 'approve' }) as never,
+						req,
+					),
+				).rejects.toThrow('At least 1 comment ID is required');
+
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: [], action: 'approve' }) as never,
+						req,
+					),
+				).rejects.toThrow('At least 1 comment ID is required');
+			});
+
+			it('rejects missing or blank action', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: '' }) as never,
+						req,
+					),
+				).rejects.toThrow('Action is required for bulk comment action');
+
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: '   ' }) as never,
+						req,
+					),
+				).rejects.toThrow('Action is required for bulk comment action');
+
+				await expect(
+					validateBulkCommentAction.call(createMockContext({ ids: 'cmt_1' }) as never, req),
+				).rejects.toThrow('Action is required for bulk comment action');
+			});
+
+			it('rejects invalid action strings with descriptive error', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: 'unapprove' }) as never,
+						req,
+					),
+				).rejects.toThrow(
+					'Invalid bulk comment action: "unapprove". Must be one of: approve, spam, trash, delete',
+				);
+
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1', action: 'invalid' }) as never,
+						req,
+					),
+				).rejects.toThrow(
+					'Invalid bulk comment action: "invalid". Must be one of: approve, spam, trash, delete',
+				);
+			});
+
+			it('rejects >100 IDs', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				const ids101 = Array.from({ length: 101 }, (_, i) => `cmt_${i + 1}`);
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: ids101, action: 'trash' }) as never,
+						req,
+					),
+				).rejects.toThrow(/Cannot process more than 100 comment IDs/);
+			});
+
+			it('rejects blank/whitespace items', async () => {
+				const req = { method: 'POST' as const, url: 'https://example.com' };
+				await expect(
+					validateBulkCommentAction.call(
+						createMockContext({ ids: 'cmt_1,  , cmt_2', action: 'spam' }) as never,
+						req,
+					),
+				).rejects.toThrow('Comment ID cannot be empty or whitespace');
+			});
+
+			it('parses comma-separated, JSON array, and native array and passes correct body', async () => {
+				const baseReq = { method: 'POST' as const, url: 'https://example.com' };
+
+				const res1 = await validateBulkCommentAction.call(
+					createMockContext({ ids: 'cmt_1, cmt_2', action: 'approve' }) as never,
+					{ ...baseReq },
+				);
+				expect(res1.body).toEqual({
+					ids: ['cmt_1', 'cmt_2'],
+					action: 'approve',
+				});
+
+				const res2 = await validateBulkCommentAction.call(
+					createMockContext({ ids: '["cmt_3", "cmt_4"]', action: 'spam' }) as never,
+					{ ...baseReq },
+				);
+				expect(res2.body).toEqual({
+					ids: ['cmt_3', 'cmt_4'],
+					action: 'spam',
+				});
+
+				const res3 = await validateBulkCommentAction.call(
+					createMockContext({ ids: ['cmt_5', 'cmt_6'], action: 'delete' }) as never,
+					{ ...baseReq },
+				);
+				expect(res3.body).toEqual({
+					ids: ['cmt_5', 'cmt_6'],
+					action: 'delete',
+				});
+			});
+		});
+	});
+
+	describe('resource and operation counts', () => {
+		it('registers Comment resource in resource options', () => {
+			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
+			const options = resourceProp?.options as INodePropertyOptions[];
+			expect(options.some((opt) => opt.value === 'comment' && opt.name === 'Comment')).toBe(true);
+			expect(resourceProp?.default).toBe('content');
+		});
+
+		it('preserves existing 51 operations and adds 6 comment operations for 57 total', () => {
+			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
+			const countsByResource: Record<string, number> = {};
+			let totalOperations = 0;
+
+			for (const prop of operationProps) {
+				const resources = (prop.displayOptions?.show?.resource || []) as string[];
+				const count = (prop.options as INodePropertyOptions[]).length;
+				for (const res of resources) {
+					countsByResource[res] = (countsByResource[res] || 0) + count;
+				}
+				totalOperations += count;
+			}
+
+			expect(countsByResource['content']).toBe(16);
+			expect(countsByResource['media']).toBe(11);
+			expect(countsByResource['taxonomy']).toBe(10);
+			expect(countsByResource['search']).toBe(5);
+			expect(countsByResource['redirect']).toBe(9);
+			// Existing 5 resources sum to 51
+			expect(
+				countsByResource['content'] +
+					countsByResource['media'] +
+					countsByResource['taxonomy'] +
+					countsByResource['search'] +
+					countsByResource['redirect'],
+			).toBe(51);
+
+			// Comment resource adds 6
+			expect(countsByResource['comment']).toBe(6);
+			expect(totalOperations).toBe(57);
 		});
 	});
 
