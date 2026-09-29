@@ -2227,18 +2227,74 @@ describe('EmDash integration tests', () => {
 				);
 			});
 
-			it('clears previewMediaId when set to null, "null", or empty string', async () => {
-				const ctx = createMockContext({
-					updateFields: { previewMediaId: 'null' },
+			it('handles previewMediaId: trims string, converts empty/"null"/null to null, rejects non-strings, and preserves omission', async () => {
+				// string ID -> trimmed string
+				const ctxString = createMockContext({
+					updateFields: { previewMediaId: '  med_456  ' },
 				});
-				const result = await validateUpdateSection.call(ctx as never, { ...req });
-				expect(result.body).toEqual({ previewMediaId: null });
+				const resString = await validateUpdateSection.call(ctxString as never, { ...req });
+				expect(resString.body).toEqual({ previewMediaId: 'med_456' });
 
+				// empty string -> null
 				const ctxEmpty = createMockContext({
 					updateFields: { previewMediaId: '' },
 				});
-				const resultEmpty = await validateUpdateSection.call(ctxEmpty as never, { ...req });
-				expect(resultEmpty.body).toEqual({ previewMediaId: null });
+				const resEmpty = await validateUpdateSection.call(ctxEmpty as never, { ...req });
+				expect(resEmpty.body).toEqual({ previewMediaId: null });
+
+				// "null" string -> null
+				const ctxNullStr = createMockContext({
+					updateFields: { previewMediaId: 'null' },
+				});
+				const resNullStr = await validateUpdateSection.call(ctxNullStr as never, { ...req });
+				expect(resNullStr.body).toEqual({ previewMediaId: null });
+
+				// null -> null
+				const ctxNull = createMockContext({
+					updateFields: { previewMediaId: null },
+				});
+				const resNull = await validateUpdateSection.call(ctxNull as never, { ...req });
+				expect(resNull.body).toEqual({ previewMediaId: null });
+
+				// number (123) -> throws error
+				const ctxNum = createMockContext({
+					updateFields: { previewMediaId: 123 },
+				});
+				await expect(validateUpdateSection.call(ctxNum as never, { ...req })).rejects.toThrow(
+					'Preview Media ID must be a string, null, or empty string (received number)',
+				);
+
+				// boolean (true) -> throws error
+				const ctxBool = createMockContext({
+					updateFields: { previewMediaId: true },
+				});
+				await expect(validateUpdateSection.call(ctxBool as never, { ...req })).rejects.toThrow(
+					'Preview Media ID must be a string, null, or empty string (received boolean)',
+				);
+
+				// object ({}) -> throws error
+				const ctxObj = createMockContext({
+					updateFields: { previewMediaId: {} },
+				});
+				await expect(validateUpdateSection.call(ctxObj as never, { ...req })).rejects.toThrow(
+					'Preview Media ID must be a string, null, or empty string (received object)',
+				);
+
+				// array ([]) -> throws error
+				const ctxArr = createMockContext({
+					updateFields: { previewMediaId: [] },
+				});
+				await expect(validateUpdateSection.call(ctxArr as never, { ...req })).rejects.toThrow(
+					'Preview Media ID must be a string, null, or empty string (received object)',
+				);
+
+				// omitted -> not present in body
+				const ctxOmitted = createMockContext({
+					updateFields: { title: 'Updated' },
+				});
+				const resOmitted = await validateUpdateSection.call(ctxOmitted as never, { ...req });
+				expect(resOmitted.body).toEqual({ title: 'Updated' });
+				expect('previewMediaId' in (resOmitted.body as Record<string, unknown>)).toBe(false);
 			});
 
 			it('updates title, content, and keywords', async () => {
@@ -2532,6 +2588,83 @@ describe('EmDash integration tests', () => {
 				);
 			});
 
+			it('clearing title with blank string sends "" (not null)', async () => {
+				const ctx = createMockContext({
+					updateFields: { title: '' },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ title: '' });
+			});
+
+			it('clearing menuName with blank string sends "" (not null)', async () => {
+				const ctx = createMockContext({
+					updateFields: { menuName: '' },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ menuName: '' });
+			});
+
+			it('clearing componentId with blank string sends "" (not null)', async () => {
+				const ctx = createMockContext({
+					updateFields: { componentId: '' },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ componentId: '' });
+			});
+
+			it('trims non-empty strings for title, menuName, componentId', async () => {
+				const ctx = createMockContext({
+					updateFields: {
+						title: '  Trimmed Title  ',
+						menuName: '  main-nav  ',
+						componentId: '  cmp_hero  ',
+					},
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({
+					title: 'Trimmed Title',
+					menuName: 'main-nav',
+					componentId: 'cmp_hero',
+				});
+			});
+
+			it('does not include omitted fields in body', async () => {
+				const ctx = createMockContext({
+					updateFields: { title: 'Only Title' },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ title: 'Only Title' });
+				expect('menuName' in (result.body as Record<string, unknown>)).toBe(false);
+				expect('componentId' in (result.body as Record<string, unknown>)).toBe(false);
+				expect('content' in (result.body as Record<string, unknown>)).toBe(false);
+				expect('componentProps' in (result.body as Record<string, unknown>)).toBe(false);
+				expect('type' in (result.body as Record<string, unknown>)).toBe(false);
+			});
+
+			it('preserves empty array [] for content', async () => {
+				const ctx = createMockContext({
+					updateFields: { content: [] },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ content: [] });
+			});
+
+			it('preserves empty object {} for componentProps', async () => {
+				const ctx = createMockContext({
+					updateFields: { componentProps: {} },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ componentProps: {} });
+			});
+
+			it('changing type alone sends only type', async () => {
+				const ctx = createMockContext({
+					updateFields: { type: 'menu' },
+				});
+				const result = await validateUpdateWidget.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ type: 'menu' });
+			});
+
 			it('updates provided fields', async () => {
 				const ctx = createMockContext({
 					updateFields: {
@@ -2576,11 +2709,69 @@ describe('EmDash integration tests', () => {
 
 	describe('listSearch getSections and getWidgetAreas', () => {
 		describe('getSections', () => {
-			it('formats section items as title (slug)', async () => {
+			it('formats section items as title (slug) and requests limit: 100', async () => {
 				const mockSections = [
 					{ slug: 'hero-banner', title: 'Hero Banner' },
 					{ slug: 'footer-links', title: 'Footer Links' },
 				];
+
+				let capturedOptions: Record<string, unknown> | undefined;
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async (
+							_cred: string,
+							options: Record<string, unknown>,
+						) => {
+							capturedOptions = options;
+							return {
+								success: true,
+								data: { items: mockSections },
+							};
+						},
+					},
+				};
+
+				const result = await getSections.call(context as never);
+				expect(capturedOptions?.qs).toEqual({ limit: 100 });
+				expect(result.results).toEqual([
+					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
+					{ name: 'Footer Links (footer-links)', value: 'footer-links' },
+				]);
+			});
+
+			it('passes limit: 100 and search: filter when filter is supplied, and filters results', async () => {
+				const mockSections = [
+					{ slug: 'hero-banner', title: 'Hero Banner' },
+					{ slug: 'footer-links', title: 'Footer Links' },
+				];
+
+				let capturedOptions: Record<string, unknown> | undefined;
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async (
+							_cred: string,
+							options: Record<string, unknown>,
+						) => {
+							capturedOptions = options;
+							return {
+								success: true,
+								data: { items: mockSections },
+							};
+						},
+					},
+				};
+
+				const result = await getSections.call(context as never, 'hero');
+				expect(capturedOptions?.qs).toEqual({ limit: 100, search: 'hero' });
+				expect(result.results).toEqual([
+					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
+				]);
+			});
+
+			it('uses slug fallback when title is missing', async () => {
+				const mockSections = [{ slug: 'no-title-section', title: '' }];
 
 				const context = {
 					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
@@ -2593,32 +2784,7 @@ describe('EmDash integration tests', () => {
 				};
 
 				const result = await getSections.call(context as never);
-				expect(result.results).toEqual([
-					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
-					{ name: 'Footer Links (footer-links)', value: 'footer-links' },
-				]);
-			});
-
-			it('filters sections by search term', async () => {
-				const mockSections = [
-					{ slug: 'hero-banner', title: 'Hero Banner' },
-					{ slug: 'footer-links', title: 'Footer Links' },
-				];
-
-				const context = {
-					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
-					helpers: {
-						httpRequestWithAuthentication: async () => ({
-							success: true,
-							data: { items: mockSections },
-						}),
-					},
-				};
-
-				const result = await getSections.call(context as never, 'hero');
-				expect(result.results).toEqual([
-					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
-				]);
+				expect(result.results).toEqual([{ name: 'no-title-section', value: 'no-title-section' }]);
 			});
 
 			it('returns empty results on API error', async () => {

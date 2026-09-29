@@ -648,12 +648,19 @@ export async function validateUpdateSection(
 	}
 	if ('previewMediaId' in updateFields && updateFields.previewMediaId !== undefined) {
 		const val = updateFields.previewMediaId;
-		if (val === null || val === 'null' || val === '') {
+		if (val === null) {
 			body.previewMediaId = null;
 		} else if (typeof val === 'string') {
-			body.previewMediaId = val.trim();
+			const trimmed = val.trim();
+			if (trimmed === '' || trimmed === 'null') {
+				body.previewMediaId = null;
+			} else {
+				body.previewMediaId = trimmed;
+			}
 		} else {
-			body.previewMediaId = String(val);
+			throw new Error(
+				`Preview Media ID must be a string, null, or empty string (received ${typeof val})`,
+			);
 		}
 	}
 
@@ -821,7 +828,10 @@ export async function validateUpdateWidget(
 		body.type = type;
 	}
 	if ('title' in updateFields && updateFields.title !== undefined) {
-		body.title = String(updateFields.title).trim() || null;
+		body.title =
+			typeof updateFields.title === 'string'
+				? updateFields.title.trim()
+				: String(updateFields.title ?? '').trim();
 	}
 	if ('content' in updateFields && updateFields.content !== undefined) {
 		body.content = validateStructuredContent(updateFields.content, 'Content');
@@ -830,12 +840,17 @@ export async function validateUpdateWidget(
 		const raw = updateFields.menuName;
 		const name =
 			typeof raw === 'object' && raw !== null
-				? String((raw as { value?: unknown }).value || '').trim()
-				: String(raw || '').trim();
-		body.menuName = name || null;
+				? String((raw as { value?: unknown }).value ?? '').trim()
+				: typeof raw === 'string'
+					? raw.trim()
+					: String(raw ?? '').trim();
+		body.menuName = name;
 	}
 	if ('componentId' in updateFields && updateFields.componentId !== undefined) {
-		body.componentId = String(updateFields.componentId).trim() || null;
+		body.componentId =
+			typeof updateFields.componentId === 'string'
+				? updateFields.componentId.trim()
+				: String(updateFields.componentId ?? '').trim();
 	}
 	if ('componentProps' in updateFields && updateFields.componentProps !== undefined) {
 		body.componentProps = validateJsonObject(updateFields.componentProps, 'Component Props');

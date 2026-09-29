@@ -1,4 +1,5 @@
 import type {
+	IDataObject,
 	ILoadOptionsFunctions,
 	INodeListSearchItems,
 	INodeListSearchResult,
@@ -21,8 +22,13 @@ export async function getSections(
 ): Promise<INodeListSearchResult> {
 	let sections: SectionRecord[] = [];
 
+	const qs: IDataObject = { limit: 100 };
+	if (filter && filter.trim()) {
+		qs.search = filter.trim();
+	}
+
 	try {
-		const response = (await emdashApiRequest.call(this, 'GET', '/sections')) as
+		const response = (await emdashApiRequest.call(this, 'GET', '/sections', undefined, qs)) as
 			| SectionRecord[]
 			| SectionListResponse;
 
@@ -45,7 +51,7 @@ export async function getSections(
 	}
 
 	const results: INodeListSearchItems[] = sections.map((section) => ({
-		name: `${section.title} (${section.slug})`,
+		name: section.title ? `${section.title} (${section.slug})` : section.slug,
 		value: section.slug,
 	}));
 
