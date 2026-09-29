@@ -1773,18 +1773,33 @@ export async function validateUpdateCollection(
 	if ('hidden' in updateFields && typeof updateFields.hidden === 'boolean') {
 		body.hidden = updateFields.hidden;
 	}
+	const hasSortOrder = 'sortOrder' in updateFields && updateFields.sortOrder !== undefined;
+	const clearSortOrder = updateFields.clearSortOrder === true;
+
 	if (
-		'sortOrder' in updateFields &&
-		updateFields.sortOrder !== undefined &&
+		clearSortOrder &&
+		hasSortOrder &&
 		updateFields.sortOrder !== null &&
-		(updateFields.sortOrder as unknown) !== ''
+		(updateFields.sortOrder as unknown) !== '' &&
+		(updateFields.sortOrder as unknown) !== 'null'
 	) {
-		const val = updateFields.sortOrder;
-		if (typeof val !== 'number' || !Number.isInteger(val)) {
-			throw new Error('sortOrder must be an integer');
-		}
-		body.sortOrder = val;
+		throw new Error('Cannot specify both sortOrder and clearSortOrder');
 	}
+
+	if (clearSortOrder) {
+		body.sortOrder = null;
+	} else if (hasSortOrder) {
+		const val = updateFields.sortOrder;
+		if (val === null || (val as unknown) === 'null') {
+			body.sortOrder = null;
+		} else if ((val as unknown) !== '') {
+			if (typeof val !== 'number' || !Number.isInteger(val)) {
+				throw new Error('sortOrder must be an integer');
+			}
+			body.sortOrder = val;
+		}
+	}
+
 	if ('group' in updateFields && updateFields.group !== undefined) {
 		const val = updateFields.group;
 		if (val === null) {
@@ -2088,16 +2103,13 @@ export async function validateUpdateField(
 		}
 	}
 
-	if ('widget' in updateFields && updateFields.widget !== undefined) {
-		const val = updateFields.widget;
-		if (val === null) {
-			body.widget = null;
-		} else if (typeof val === 'string') {
-			const trimmed = val.trim();
-			body.widget = trimmed === '' || trimmed === 'null' ? null : trimmed;
-		} else {
-			body.widget = val;
-		}
+	if (
+		'widget' in updateFields &&
+		updateFields.widget !== undefined &&
+		updateFields.widget !== null
+	) {
+		const trimmed = String(updateFields.widget).trim();
+		body.widget = trimmed;
 	}
 
 	if (

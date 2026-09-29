@@ -25,6 +25,14 @@ export const schemaUpdateCollectionDescription: INodeProperties[] = [
 				description: 'Admin UI configuration (e.g. listColumns, quickCreate) as a JSON object',
 			},
 			{
+				displayName: 'Clear Sort Order',
+				name: 'clearSortOrder',
+				type: 'boolean',
+				default: false,
+				description:
+					'Whether to clear the explicit sort order position, falling back to default alphabetical ordering. Mutually exclusive with Sort Order.',
+			},
+			{
 				displayName: 'Comments Auto-Approve Users',
 				name: 'commentsAutoApproveUsers',
 				type: 'boolean',
@@ -133,7 +141,8 @@ export const schemaUpdateCollectionDescription: INodeProperties[] = [
 				name: 'sortOrder',
 				type: 'number',
 				default: 0,
-				description: 'Sort order position in the admin navigation sidebar',
+				description:
+					'Sort order position in the admin navigation sidebar (integer). To clear explicit position and revert to alphabetical order, enable Clear Sort Order or pass null.',
 			},
 			{
 				displayName: 'Supports',

@@ -346,3 +346,5 @@ export const schemaDescription: INodeProperties[] = [
 	...schemaDeleteFieldDescription,
 	...schemaReorderFieldsDescription,
 ];
+
+export { schemaUpdateCollectionDescription } from './updateCollection';

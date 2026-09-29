@@ -51,7 +51,8 @@ export const schemaUpdateFieldDescription: INodeProperties[] = [
 				name: 'required',
 				type: 'boolean',
 				default: false,
-				description: 'Whether entries must provide a value for this field',
+				description:
+					'Whether entries must provide a value for this field. NOTE: Toggling required on an existing field requires a content migration and will be rejected upstream with FIELD_UPDATE_REQUIRES_MIGRATION.',
 			},
 			{
 				displayName: 'Searchable',
@@ -72,7 +73,8 @@ export const schemaUpdateFieldDescription: INodeProperties[] = [
 				name: 'translatable',
 				type: 'boolean',
 				default: false,
-				description: 'Whether this field maintains separate translated values per locale variant',
+				description:
+					'Whether this field maintains separate translated values per locale variant. NOTE: Changing a translatable field to false requires a content migration and will be rejected upstream with FIELD_UPDATE_REQUIRES_MIGRATION.',
 			},
 			{
 				displayName: 'Type',
@@ -80,14 +82,16 @@ export const schemaUpdateFieldDescription: INodeProperties[] = [
 				type: 'options',
 				options: fieldTypeOptions,
 				default: 'string',
-				description: 'Data type of the field',
+				description:
+					'Data type of the field. NOTE: Most type changes across column affinities (e.g. text to number) require a content migration and will be rejected upstream with FIELD_TYPE_COLUMN_CHANGE or FIELD_TYPE_CHANGE_REQUIRES_MIGRATION. Compatible text-alias transitions (e.g. text to string) or no-op updates are permitted.',
 			},
 			{
 				displayName: 'Unique',
 				name: 'unique',
 				type: 'boolean',
 				default: false,
-				description: 'Whether values in this field must be unique across all collection entries',
+				description:
+					'Whether values in this field must be unique across all collection entries. NOTE: Toggling unique on an existing field requires a content migration and will be rejected upstream with FIELD_UPDATE_REQUIRES_MIGRATION.',
 			},
 			{
 				displayName: 'Validation (JSON)',
@@ -102,7 +106,8 @@ export const schemaUpdateFieldDescription: INodeProperties[] = [
 				name: 'widget',
 				type: 'string',
 				default: '',
-				description: 'Custom UI widget component identifier for editing this field',
+				description:
+					'Custom UI widget component identifier for editing this field. Pass an empty string to clear the widget.',
 			},
 		],
 	},

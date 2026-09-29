@@ -40,6 +40,7 @@ import {
 	parseAndValidateFieldSlugs,
 	SCHEMA_FIELD_TYPES,
 } from '../nodes/EmDash/shared/transport';
+import { schemaUpdateCollectionDescription } from '../nodes/EmDash/resources/schema';
 import { getCollections } from '../nodes/EmDash/listSearch/getCollections';
 import { getMenus } from '../nodes/EmDash/listSearch/getMenus';
 import { getSchemaFields } from '../nodes/EmDash/listSearch/getSchemaFields';
@@ -3933,6 +3934,18 @@ describe('EmDash integration tests', () => {
 					'Delete Relation also deletes the underlying relationship, all relation edges, and the field bound to the other side.',
 				);
 			});
+
+			it('defines clearSortOrder in schemaUpdateCollectionDescription with type boolean and default false', () => {
+				const updateFieldsProp = schemaUpdateCollectionDescription.find(
+					(p) => p.name === 'updateFields',
+				);
+				const clearSortOrderProp = (updateFieldsProp?.options as INodeProperties[])?.find(
+					(o) => o.name === 'clearSortOrder',
+				);
+				expect(clearSortOrderProp).toBeDefined();
+				expect(clearSortOrderProp?.type).toBe('boolean');
+				expect(clearSortOrderProp?.default).toBe(false);
+			});
 		});
 
 		describe('validateCreateCollection preSend', () => {
@@ -4091,6 +4104,54 @@ describe('EmDash integration tests', () => {
 				});
 				const result = await validateUpdateCollection.call(ctx as never, { ...req });
 				expect(result.body).toEqual({ group: null });
+			});
+
+			it('sets sortOrder to an integer', async () => {
+				const ctx = createMockContext({
+					updateFields: { sortOrder: 5 },
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ sortOrder: 5 });
+			});
+
+			it('clears sortOrder with null when clearSortOrder is true', async () => {
+				const ctx = createMockContext({
+					updateFields: { clearSortOrder: true },
+				});
+				const result = await validateUpdateCollection.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ sortOrder: null });
+			});
+
+			it('clears sortOrder with null when sortOrder is null or "null"', async () => {
+				const ctxNull = createMockContext({
+					updateFields: { sortOrder: null },
+				});
+				const resultNull = await validateUpdateCollection.call(ctxNull as never, { ...req });
+				expect(resultNull.body).toEqual({ sortOrder: null });
+
+				const ctxNullStr = createMockContext({
+					updateFields: { sortOrder: 'null' },
+				});
+				const resultNullStr = await validateUpdateCollection.call(ctxNullStr as never, { ...req });
+				expect(resultNullStr.body).toEqual({ sortOrder: null });
+			});
+
+			it('throws when both clearSortOrder and numeric sortOrder are specified', async () => {
+				const ctx = createMockContext({
+					updateFields: { clearSortOrder: true, sortOrder: 5 },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/Cannot specify both sortOrder and clearSortOrder/i,
+				);
+			});
+
+			it('rejects non-integer sortOrder', async () => {
+				const ctx = createMockContext({
+					updateFields: { sortOrder: 3.5 },
+				});
+				await expect(validateUpdateCollection.call(ctx as never, { ...req })).rejects.toThrow(
+					/sortOrder must be an integer/i,
+				);
 			});
 		});
 
@@ -4306,6 +4367,38 @@ describe('EmDash integration tests', () => {
 				await expect(validateUpdateField.call(ctx as never, { ...req })).rejects.toThrow(
 					/Invalid field type: "bogus"/i,
 				);
+			});
+
+			it('trims whitespace on widget string', async () => {
+				const ctx = createMockContext({
+					updateFields: { widget: '  textarea  ' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ widget: 'textarea' });
+			});
+
+			it('preserves empty string widget to clear the widget', async () => {
+				const ctx = createMockContext({
+					updateFields: { widget: '' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect(result.body).toEqual({ widget: '' });
+			});
+
+			it('does not set widget on body when omitted', async () => {
+				const ctx = createMockContext({
+					updateFields: { label: 'Updated Label' },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect('widget' in (result.body as Record<string, unknown>)).toBe(false);
+			});
+
+			it('does not set widget on body when widget is null', async () => {
+				const ctx = createMockContext({
+					updateFields: { label: 'Updated Label', widget: null },
+				});
+				const result = await validateUpdateField.call(ctx as never, { ...req });
+				expect('widget' in (result.body as Record<string, unknown>)).toBe(false);
 			});
 		});
 
