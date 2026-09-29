@@ -55,6 +55,60 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Content Get Translations: requires collection and id
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'getTranslations',
+				requiredControls: ['collection', 'id'],
+			}),
+		).not.toThrow();
+
+		// Content Get Authors: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'getAuthors',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Content Get Trashed: requires collection
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'getTrashed',
+				requiredControls: ['collection'],
+			}),
+		).not.toThrow();
+
+		// Content Get Edit Lock: requires collection and id
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'getLock',
+				requiredControls: ['collection', 'id'],
+			}),
+		).not.toThrow();
+
+		// Content Acquire Edit Lock: requires collection and id
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'acquireLock',
+				requiredControls: ['collection', 'id'],
+			}),
+		).not.toThrow();
+
+		// Content Release Edit Lock: requires collection and id
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'content',
+				operation: 'releaseLock',
+				requiredControls: ['collection', 'id'],
+			}),
+		).not.toThrow();
+
 		// Media Get: requires mediaId
 		expect(() =>
 			assertRequiredControls(description, {
@@ -555,6 +609,19 @@ describe('EmDash node operation contracts', () => {
 		expect(collection?.displayOptions?.show).toEqual({
 			resource: ['content'],
 		});
+
+		const contentId = description.properties.find(
+			({ name, displayOptions }) =>
+				name === 'id' && displayOptions?.show?.resource?.includes('content'),
+		);
+		expect(contentId?.required).toBe(true);
+		const contentIdOps = (contentId?.displayOptions?.show?.operation || []) as string[];
+		expect(contentIdOps).toContain('getTranslations');
+		expect(contentIdOps).toContain('getLock');
+		expect(contentIdOps).toContain('acquireLock');
+		expect(contentIdOps).toContain('releaseLock');
+		expect(contentIdOps).not.toContain('getAuthors');
+		expect(contentIdOps).not.toContain('getTrashed');
 
 		const mediaId = description.properties.find(({ name }) => name === 'mediaId');
 		expect(mediaId?.required).toBe(true);

@@ -247,10 +247,40 @@ describe('EmDash integration tests', () => {
 				method: 'POST',
 				url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/terms/{{$parameter.taxonomy}}',
 			},
+			{
+				name: 'acquireLock',
+				method: 'POST',
+				url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+			},
+			{
+				name: 'getAuthors',
+				method: 'GET',
+				url: '=/content/{{$parameter.collection}}/authors',
+			},
+			{
+				name: 'getLock',
+				method: 'GET',
+				url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+			},
+			{
+				name: 'getTrashed',
+				method: 'GET',
+				url: '=/content/{{$parameter.collection}}/trash',
+			},
+			{
+				name: 'getTranslations',
+				method: 'GET',
+				url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/translations',
+			},
+			{
+				name: 'releaseLock',
+				method: 'DELETE',
+				url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+			},
 		];
 
-		it('registers all 16 content operations with correct HTTP methods and paths', () => {
-			expect(options).toHaveLength(16);
+		it('registers all 22 content operations with correct HTTP methods and paths', () => {
+			expect(options).toHaveLength(22);
 			for (const expected of expectedOperations) {
 				const op = getOperation(expected.name);
 				expect(op, `Operation ${expected.name} should exist`).toBeDefined();
@@ -259,26 +289,153 @@ describe('EmDash integration tests', () => {
 			}
 		});
 
-		it('unwraps data.items for getAll and data for single item operations', () => {
-			const getAll = getOperation('getAll');
-			expect(getAll?.routing?.output?.postReceive).toEqual([
-				{
-					type: 'rootProperty',
-					properties: {
-						property: 'data.items',
+		it('unwraps data.items for collection queries and data for single item/status operations', () => {
+			for (const listOp of ['getAll', 'getAuthors', 'getTrashed']) {
+				const op = getOperation(listOp);
+				expect(op?.routing?.output?.postReceive, `${listOp} should unwrap data.items`).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: 'data.items',
+						},
 					},
-				},
-			]);
+				]);
+			}
 
-			const get = getOperation('get');
-			expect(get?.routing?.output?.postReceive).toEqual([
-				{
-					type: 'rootProperty',
-					properties: {
-						property: 'data',
+			for (const singleOp of ['get', 'getTranslations', 'getLock', 'acquireLock', 'releaseLock']) {
+				const op = getOperation(singleOp);
+				expect(op?.routing?.output?.postReceive, `${singleOp} should unwrap data`).toEqual([
+					{
+						type: 'rootProperty',
+						properties: {
+							property: 'data',
+						},
+					},
+				]);
+			}
+		});
+
+		it('configures getTrashed with returnAll, cursor pagination, limit, and locale query parameters', () => {
+			const returnAll = node.description.properties.find(
+				(p) =>
+					p.name === 'returnAll' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('getTrashed'),
+			);
+			expect(returnAll).toBeDefined();
+			expect(returnAll?.default).toBe(false);
+			expect(returnAll?.routing?.send?.paginate).toBe('={{ $value }}');
+			expect(returnAll?.routing?.send?.property).toBe('limit');
+			expect(returnAll?.routing?.send?.value).toBe('100');
+			expect(returnAll?.routing?.operations?.pagination).toEqual({
+				type: 'generic',
+				properties: {
+					continue: '={{ !!$response.body?.data?.nextCursor }}',
+					request: {
+						qs: {
+							cursor: '={{ $response.body?.data?.nextCursor }}',
+						},
 					},
 				},
-			]);
+			});
+
+			const limit = node.description.properties.find(
+				(p) =>
+					p.name === 'limit' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('getTrashed'),
+			);
+			expect(limit).toBeDefined();
+			expect(limit?.default).toBe(50);
+			expect(limit?.typeOptions?.minValue).toBe(1);
+			expect(limit?.typeOptions?.maxValue).toBe(100);
+			expect(limit?.routing?.send?.type).toBe('query');
+			expect(limit?.routing?.send?.property).toBe('limit');
+			expect(limit?.routing?.output?.maxResults).toBe('={{$value}}');
+
+			const locale = node.description.properties.find(
+				(p) =>
+					p.name === 'locale' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('getTrashed'),
+			);
+			expect(locale).toBeDefined();
+			expect(locale?.default).toBe('');
+			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+		});
+
+		it('configures getLock with locale query parameter', () => {
+			const locale = node.description.properties.find(
+				(p) =>
+					p.name === 'locale' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('getLock'),
+			);
+			expect(locale).toBeDefined();
+			expect(locale?.default).toBe('');
+			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+		});
+
+		it('configures acquireLock with locale query parameter, body parameters, and operation routing', () => {
+			const acquireOp = getOperation('acquireLock');
+			expect(acquireOp?.routing?.request?.qs?.locale).toBe('={{$parameter.locale || undefined}}');
+			const acquireBody = acquireOp?.routing?.request?.body as Record<string, unknown> | undefined;
+			expect(acquireBody?.takeover).toBe(
+				'={{$parameter.takeover !== undefined ? $parameter.takeover : undefined}}',
+			);
+			expect(acquireBody?.token).toBe('={{$parameter.token || undefined}}');
+
+			const takeover = node.description.properties.find(
+				(p) =>
+					p.name === 'takeover' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('acquireLock'),
+			);
+			expect(takeover).toBeDefined();
+			expect(takeover?.type).toBe('boolean');
+			expect(takeover?.default).toBe(false);
+
+			const token = node.description.properties.find(
+				(p) =>
+					p.name === 'token' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('acquireLock'),
+			);
+			expect(token).toBeDefined();
+			expect(token?.type).toBe('string');
+			expect(token?.default).toBe('');
+
+			const locale = node.description.properties.find(
+				(p) =>
+					p.name === 'locale' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('acquireLock'),
+			);
+			expect(locale).toBeDefined();
+			expect(locale?.type).toBe('string');
+			expect(locale?.default).toBe('');
+		});
+
+		it('configures releaseLock with locale and token query parameters', () => {
+			const locale = node.description.properties.find(
+				(p) =>
+					p.name === 'locale' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('releaseLock'),
+			);
+			expect(locale).toBeDefined();
+			expect(locale?.default).toBe('');
+			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+
+			const token = node.description.properties.find(
+				(p) =>
+					p.name === 'token' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('releaseLock'),
+			);
+			expect(token).toBeDefined();
+			expect(token?.default).toBe('');
+			expect(token?.routing?.request?.qs?.token).toBe('={{$value || undefined}}');
 		});
 	});
 
@@ -2770,6 +2927,64 @@ describe('EmDash integration tests', () => {
 				]);
 			});
 
+			it('trims leading and trailing whitespace from filter for both API search and local filtering', async () => {
+				const mockSections = [
+					{ slug: 'hero-banner', title: 'Hero Banner' },
+					{ slug: 'footer-links', title: 'Footer Links' },
+				];
+
+				let capturedOptions: Record<string, unknown> | undefined;
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async (
+							_cred: string,
+							options: Record<string, unknown>,
+						) => {
+							capturedOptions = options;
+							return {
+								success: true,
+								data: { items: mockSections },
+							};
+						},
+					},
+				};
+
+				const result = await getSections.call(context as never, '  hero  ');
+				expect(capturedOptions?.qs).toEqual({ limit: 100, search: 'hero' });
+				expect(result.results).toEqual([
+					{ name: 'Hero Banner (hero-banner)', value: 'hero-banner' },
+				]);
+			});
+
+			it('treats whitespace-only filter as empty and does not pass search parameter', async () => {
+				const mockSections = [
+					{ slug: 'hero-banner', title: 'Hero Banner' },
+					{ slug: 'footer-links', title: 'Footer Links' },
+				];
+
+				let capturedOptions: Record<string, unknown> | undefined;
+				const context = {
+					getCredentials: async () => ({ siteUrl: 'https://cms.example.com' }),
+					helpers: {
+						httpRequestWithAuthentication: async (
+							_cred: string,
+							options: Record<string, unknown>,
+						) => {
+							capturedOptions = options;
+							return {
+								success: true,
+								data: { items: mockSections },
+							};
+						},
+					},
+				};
+
+				const result = await getSections.call(context as never, '   ');
+				expect(capturedOptions?.qs).toEqual({ limit: 100 });
+				expect(result.results).toHaveLength(2);
+			});
+
 			it('uses slug fallback when title is missing', async () => {
 				const mockSections = [{ slug: 'no-title-section', title: '' }];
 
@@ -2882,7 +3097,7 @@ describe('EmDash integration tests', () => {
 			expect(resourceProp?.default).toBe('content');
 		});
 
-		it('preserves existing 68 operations and adds 5 section and 8 widgetArea operations for 81 total', () => {
+		it('preserves existing operations and registers 87 total across 10 resources with 22 content operations', () => {
 			const operationProps = node.description.properties.filter((p) => p.name === 'operation');
 			const countsByResource: Record<string, number> = {};
 			let totalOperations = 0;
@@ -2896,7 +3111,7 @@ describe('EmDash integration tests', () => {
 				totalOperations += count;
 			}
 
-			expect(countsByResource['content']).toBe(16);
+			expect(countsByResource['content']).toBe(22);
 			expect(countsByResource['media']).toBe(11);
 			expect(countsByResource['taxonomy']).toBe(10);
 			expect(countsByResource['search']).toBe(5);
@@ -2916,9 +3131,9 @@ describe('EmDash integration tests', () => {
 					countsByResource['comment'] +
 					countsByResource['menu'] +
 					countsByResource['settings'],
-			).toBe(68);
+			).toBe(74);
 
-			expect(totalOperations).toBe(81);
+			expect(totalOperations).toBe(87);
 		});
 	});
 

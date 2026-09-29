@@ -16,6 +16,12 @@ import { contentCompareDescription } from './compare';
 import { contentDiscardDraftDescription } from './discardDraft';
 import { contentGetTermsDescription } from './getContentTerms';
 import { contentSetTermsDescription } from './setContentTerms';
+import { contentAcquireLockDescription } from './acquireLock';
+import { contentGetAuthorsDescription } from './getAuthors';
+import { contentGetLockDescription } from './getLock';
+import { contentGetTrashedDescription } from './getTrashed';
+import { contentGetTranslationsDescription } from './getTranslations';
+import { contentReleaseLockDescription } from './releaseLock';
 
 const showOnlyForContent = {
 	resource: ['content'],
@@ -31,6 +37,35 @@ export const contentDescription: INodeProperties[] = [
 			show: showOnlyForContent,
 		},
 		options: [
+			{
+				name: 'Acquire Edit Lock',
+				value: 'acquireLock',
+				action: 'Acquire edit lock',
+				description: 'Acquire or refresh an edit lock lease on a content item',
+				routing: {
+					request: {
+						method: 'POST',
+						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+						qs: {
+							locale: '={{$parameter.locale || undefined}}',
+						},
+						body: {
+							takeover: '={{$parameter.takeover !== undefined ? $parameter.takeover : undefined}}',
+							token: '={{$parameter.token || undefined}}',
+						},
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
 			{
 				name: 'Compare Draft and Live',
 				value: 'compare',
@@ -164,6 +199,28 @@ export const contentDescription: INodeProperties[] = [
 				},
 			},
 			{
+				name: 'Get Authors',
+				value: 'getAuthors',
+				action: 'Get content authors',
+				description: 'Get distinct authors of a collection’s content',
+				routing: {
+					request: {
+						method: 'GET',
+						url: '=/content/{{$parameter.collection}}/authors',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data.items',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
 				name: 'Get Content Terms',
 				value: 'getContentTerms',
 				action: 'Get taxonomy terms for content',
@@ -186,6 +243,28 @@ export const contentDescription: INodeProperties[] = [
 				},
 			},
 			{
+				name: 'Get Edit Lock',
+				value: 'getLock',
+				action: 'Get edit lock status',
+				description: 'Get the current edit lock status and holder for a content item',
+				routing: {
+					request: {
+						method: 'GET',
+						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
 				name: 'Get Many',
 				value: 'getAll',
 				action: 'Get many content items',
@@ -194,6 +273,50 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '=/content/{{$parameter.collection}}',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data.items',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
+				name: 'Get Translations',
+				value: 'getTranslations',
+				action: 'Get content translations',
+				description: 'Get translation variants linked to the same translation group',
+				routing: {
+					request: {
+						method: 'GET',
+						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/translations',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
+				name: 'Get Trashed',
+				value: 'getTrashed',
+				action: 'Get trashed content items',
+				description: 'Get soft-deleted content items in a collection',
+				routing: {
+					request: {
+						method: 'GET',
+						url: '=/content/{{$parameter.collection}}/trash',
 					},
 					output: {
 						postReceive: [
@@ -238,6 +361,28 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'POST',
 						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/publish',
+					},
+					output: {
+						postReceive: [
+							{
+								type: 'rootProperty',
+								properties: {
+									property: 'data',
+								},
+							},
+						],
+					},
+				},
+			},
+			{
+				name: 'Release Edit Lock',
+				value: 'releaseLock',
+				action: 'Release edit lock',
+				description: 'Release the caller’s edit lock on a content item',
+				routing: {
+					request: {
+						method: 'DELETE',
+						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
 					},
 					output: {
 						postReceive: [
@@ -404,4 +549,10 @@ export const contentDescription: INodeProperties[] = [
 	...contentDiscardDraftDescription,
 	...contentGetTermsDescription,
 	...contentSetTermsDescription,
+	...contentAcquireLockDescription,
+	...contentGetAuthorsDescription,
+	...contentGetLockDescription,
+	...contentGetTrashedDescription,
+	...contentGetTranslationsDescription,
+	...contentReleaseLockDescription,
 ];
