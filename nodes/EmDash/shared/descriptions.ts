@@ -293,3 +293,91 @@ export const menuItemIdProperty: INodeProperties = {
 	},
 	description: 'The ID of the menu item',
 };
+
+export const sectionSelect: INodeProperties = {
+	displayName: 'Section',
+	name: 'section',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	modes: [
+		{
+			displayName: 'From List',
+			name: 'list',
+			type: 'list',
+			placeholder: 'Select a section...',
+			typeOptions: {
+				searchListMethod: 'getSections',
+				searchable: true,
+			},
+		},
+		{
+			displayName: 'By Slug',
+			name: 'id',
+			type: 'string',
+			placeholder: 'e.g. hero-banner',
+		},
+	],
+	displayOptions: {
+		show: {
+			resource: ['section'],
+			operation: ['get', 'update', 'delete'],
+		},
+	},
+	description: 'The slug or identifier of the section',
+};
+
+export const widgetAreaSelect: INodeProperties = {
+	displayName: 'Widget Area',
+	name: 'widgetArea',
+	type: 'resourceLocator',
+	default: { mode: 'list', value: '' },
+	required: true,
+	modes: [
+		{
+			displayName: 'From List',
+			name: 'list',
+			type: 'list',
+			placeholder: 'Select a widget area...',
+			typeOptions: {
+				searchListMethod: 'getWidgetAreas',
+				searchable: true,
+			},
+		},
+		{
+			displayName: 'By Name',
+			name: 'id',
+			type: 'string',
+			placeholder: 'e.g. sidebar-main',
+		},
+	],
+	displayOptions: {
+		show: {
+			resource: ['widgetArea'],
+			operation: [
+				'get',
+				'delete',
+				'createWidget',
+				'updateWidget',
+				'deleteWidget',
+				'reorderWidgets',
+			],
+		},
+	},
+	description: 'The name or identifier of the widget area',
+};
+
+export const widgetIdProperty: INodeProperties = {
+	displayName: 'Widget ID',
+	name: 'widgetId',
+	type: 'string',
+	required: true,
+	default: '',
+	displayOptions: {
+		show: {
+			resource: ['widgetArea'],
+			operation: ['updateWidget', 'deleteWidget'],
+		},
+	},
+	description: 'The unique ID of the widget',
+};

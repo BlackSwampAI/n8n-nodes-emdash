@@ -433,6 +433,123 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Section GetAll: requires no controls
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'section',
+				operation: 'getAll',
+				requiredControls: [],
+			}),
+		).not.toThrow();
+
+		// Section Get: requires section
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'section',
+				operation: 'get',
+				requiredControls: ['section'],
+			}),
+		).not.toThrow();
+
+		// Section Create: requires slug, title, content
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'section',
+				operation: 'create',
+				requiredControls: ['slug', 'title', 'content'],
+			}),
+		).not.toThrow();
+
+		// Section Update: requires section
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'section',
+				operation: 'update',
+				requiredControls: ['section'],
+			}),
+		).not.toThrow();
+
+		// Section Delete: requires section
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'section',
+				operation: 'delete',
+				requiredControls: ['section'],
+			}),
+		).not.toThrow();
+
+		// Widget Area GetAll: requires no controls
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'getAll',
+				requiredControls: [],
+			}),
+		).not.toThrow();
+
+		// Widget Area Get: requires widgetArea
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'get',
+				requiredControls: ['widgetArea'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Create: requires name and label
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'create',
+				requiredControls: ['name', 'label'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Delete: requires widgetArea
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'delete',
+				requiredControls: ['widgetArea'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Create Widget: requires widgetArea and type
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'createWidget',
+				requiredControls: ['widgetArea', 'type'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Update Widget: requires widgetArea and widgetId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'updateWidget',
+				requiredControls: ['widgetArea', 'widgetId'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Delete Widget: requires widgetArea and widgetId
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'deleteWidget',
+				requiredControls: ['widgetArea', 'widgetId'],
+			}),
+		).not.toThrow();
+
+		// Widget Area Reorder Widgets: requires widgetArea and widgetIds
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'widgetArea',
+				operation: 'reorderWidgets',
+				requiredControls: ['widgetArea', 'widgetIds'],
+			}),
+		).not.toThrow();
+
 		const collection = description.properties.find(({ name }) => name === 'collection');
 		expect(collection?.required).toBe(true);
 		expect(collection?.displayOptions?.show).toEqual({
@@ -481,6 +598,28 @@ describe('EmDash node operation contracts', () => {
 		expect(settings?.required).toBe(true);
 		expect(settings?.displayOptions?.show?.resource).toEqual(['settings']);
 		expect(settings?.displayOptions?.show?.operation).toEqual(['update']);
+
+		const section = description.properties.find(({ name }) => name === 'section');
+		expect(section?.required).toBe(true);
+		expect(section?.displayOptions?.show?.resource).toEqual(['section']);
+		expect(section?.displayOptions?.show?.operation).toEqual(['get', 'update', 'delete']);
+
+		const widgetArea = description.properties.find(({ name }) => name === 'widgetArea');
+		expect(widgetArea?.required).toBe(true);
+		expect(widgetArea?.displayOptions?.show?.resource).toEqual(['widgetArea']);
+		expect(widgetArea?.displayOptions?.show?.operation).toEqual([
+			'get',
+			'delete',
+			'createWidget',
+			'updateWidget',
+			'deleteWidget',
+			'reorderWidgets',
+		]);
+
+		const widgetId = description.properties.find(({ name }) => name === 'widgetId');
+		expect(widgetId?.required).toBe(true);
+		expect(widgetId?.displayOptions?.show?.resource).toEqual(['widgetArea']);
+		expect(widgetId?.displayOptions?.show?.operation).toEqual(['updateWidget', 'deleteWidget']);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {

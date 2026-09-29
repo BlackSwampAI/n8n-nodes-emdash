@@ -10,12 +10,16 @@ import { mediaDescription } from './resources/media';
 import { menuDescription } from './resources/menu';
 import { redirectDescription } from './resources/redirect';
 import { searchDescription } from './resources/search';
+import { sectionDescription } from './resources/section';
 import { settingsDescription } from './resources/settings';
 import { taxonomyDescription } from './resources/taxonomy';
+import { widgetAreaDescription } from './resources/widgetArea';
 import { getCollections } from './listSearch/getCollections';
 import { getMediaFolders } from './listSearch/getMediaFolders';
 import { getMenus } from './listSearch/getMenus';
+import { getSections } from './listSearch/getSections';
 import { getTaxonomies } from './listSearch/getTaxonomies';
+import { getWidgetAreas } from './listSearch/getWidgetAreas';
 
 const resourceOptions: INodePropertyOptions[] = [
 	{
@@ -43,12 +47,20 @@ const resourceOptions: INodePropertyOptions[] = [
 		value: 'search',
 	},
 	{
+		name: 'Section',
+		value: 'section',
+	},
+	{
 		name: 'Settings',
 		value: 'settings',
 	},
 	{
 		name: 'Taxonomy',
 		value: 'taxonomy',
+	},
+	{
+		name: 'Widget Area',
+		value: 'widgetArea',
 	},
 ];
 
@@ -95,8 +107,10 @@ export class Emdash implements INodeType {
 			...menuDescription,
 			...redirectDescription,
 			...searchDescription,
+			...sectionDescription,
 			...settingsDescription,
 			...taxonomyDescription,
+			...widgetAreaDescription,
 		],
 	};
 
@@ -105,7 +119,9 @@ export class Emdash implements INodeType {
 			getCollections,
 			getMediaFolders,
 			getMenus,
+			getSections,
 			getTaxonomies,
+			getWidgetAreas,
 		},
 	};
 }
