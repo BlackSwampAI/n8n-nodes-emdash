@@ -1,6 +1,6 @@
 # n8n-nodes-emdash
 
-Consume and manage content, media, menus, taxonomies, search, URL redirects, and comments from EmDash CMS in n8n workflows.
+Consume and manage content, media, menus, taxonomies, search, URL redirects, comments, and settings from EmDash CMS in n8n workflows.
 
 > This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
@@ -50,6 +50,9 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Search operations**: Queries and prefix suggestions require `content:read`. Administrative operations (rebuilding an index or enabling search on a collection) require `admin`. (EmDash does not define `search:read` or `search:admin` scopes).
 - **Redirect operations**: Neither `redirects:read` nor `redirects:write` exists as a PAT scope. All redirect rules and 404 access log operations require `admin` due to fail-closed middleware scope enforcement.
 - **Comment moderation operations**: EmDash does not define granular `comments:*` PAT scopes (such as `comments:read` or `comments:moderate`). All comment moderation endpoints live under `/_emdash/api/admin/comments` and strictly require a Personal Access Token with the `admin` scope in combination with administrative RBAC permissions.
+- **Settings operations**:
+  - **PAT scopes**: Read queries (`GET`) require `settings:read` (or `admin`). Update operations (`POST`) require `settings:manage` (or `admin`).
+  - **RBAC permissions**: The authenticated user must separately possess the `settings:read` capability for reads, and `settings:manage` capability (Administrator role) for updates.
 
 ### EmDash Webhook Credential
 
@@ -60,7 +63,7 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 66 operations across 7 core resources:
+The EmDash community node provides 68 operations across 8 core resources:
 
 ### Comment (6 operations)
 
@@ -148,6 +151,11 @@ The EmDash community node provides 66 operations across 7 core resources:
 - **Get 404 Summary** (`get404Summary`): Retrieve aggregation summary of top 404 error paths.
 - **Prune 404 Log** (`prune404Log`): Delete 404 error log entries older than an ISO 8601 datetime threshold.
 - **Clear All 404 Entries** (`clear404Log`): Destructively delete all recorded 404 log entries.
+
+### Settings (2 operations)
+
+- **Get** (`get`): Retrieve current site settings object directly from the CMS without static schema constraints.
+- **Update** (`update`): Update site settings with a validated JSON object or expression via `POST /settings` (merges updates with existing settings; unspecified settings remain unchanged).
 
 ## Trigger
 
@@ -243,6 +251,19 @@ A common content automation scenario involves publishing a promotional landing p
    - **Reference ID**: `={{ $json.translationGroupId }}`
    - **Additional Fields → Target**: `_self`
 3. **Reorder Menu**: A subsequent **EmDash** node executes **Menu → Reorder Items** to place the new campaign link prominently at the front of the top-level navigation (`sortOrder: 0`).
+
+### Settings Management
+
+The Settings resource provides direct access to site-wide configuration stored in EmDash CMS:
+
+- **Get Settings** (`get`): Fetches the full settings object. The response envelope is automatically unwrapped to return the raw settings data.
+- **Update Settings** (`update`): Updates site settings by sending a validated JSON payload via `POST /settings`.
+- **Merge semantics**: EmDash merges submitted settings with existing configuration; unspecified fields remain untouched, so workflows can submit partial settings objects containing only the targeted updates.
+- **Dynamic JSON input and schema behavior**: The n8n node parameter accepts a flexible JSON object or expression for forward compatibility. Note that current upstream EmDash 1.0.1 parses update payloads with a finite Zod schema (`settingsUpdateBody`) that strips unknown properties; arbitrary custom keys are not persisted by EmDash 1.0.1, though future CMS releases may accept additional fields without requiring node UI changes.
+- **Best practices**: While partial updates do not overwrite omitted settings, calling **Get Settings** first can be useful when reviewing current values or computing dynamic property updates. Backups or exporting settings prior to broad configuration changes are always recommended.
+- **Authentication and permissions**:
+  - **Personal Access Token (PAT) Scopes**: Reading settings via `Get` requires `settings:read` (or `admin`). Modifying settings via `Update` requires `settings:manage` (or `admin`).
+  - **RBAC Capabilities**: The authenticated user account must possess the corresponding internal RBAC permission (`settings:read` capability for reads; `settings:manage` capability, typical of the Administrator role, for updates).
 
 ## Troubleshooting
 

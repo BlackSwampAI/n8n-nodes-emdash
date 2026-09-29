@@ -415,6 +415,24 @@ describe('EmDash node operation contracts', () => {
 			}),
 		).not.toThrow();
 
+		// Settings Get: requires no controls
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'settings',
+				operation: 'get',
+				requiredControls: [],
+			}),
+		).not.toThrow();
+
+		// Settings Update: requires settings
+		expect(() =>
+			assertRequiredControls(description, {
+				resource: 'settings',
+				operation: 'update',
+				requiredControls: ['settings'],
+			}),
+		).not.toThrow();
+
 		const collection = description.properties.find(({ name }) => name === 'collection');
 		expect(collection?.required).toBe(true);
 		expect(collection?.displayOptions?.show).toEqual({
@@ -458,6 +476,11 @@ describe('EmDash node operation contracts', () => {
 		expect(itemId?.required).toBe(true);
 		expect(itemId?.displayOptions?.show?.resource).toEqual(['menu']);
 		expect(itemId?.displayOptions?.show?.operation).toEqual(['updateItem', 'deleteItem']);
+
+		const settings = description.properties.find(({ name }) => name === 'settings');
+		expect(settings?.required).toBe(true);
+		expect(settings?.displayOptions?.show?.resource).toEqual(['settings']);
+		expect(settings?.displayOptions?.show?.operation).toEqual(['update']);
 	});
 
 	it('normalizes manual and list-mode resource locator values', () => {
