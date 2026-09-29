@@ -1005,22 +1005,53 @@ describe('EmDash integration tests', () => {
 		});
 
 		it('unwraps union response for upload target and deduplication short-circuit', () => {
+			/* eslint-disable @n8n/community-nodes/no-hardcoded-secrets */
 			const targetResponse = {
 				success: true,
 				data: {
-					mediaId: 'med_staged123',
 					uploadUrl: 'https://s3.example.com/bucket/key',
 					method: 'PUT',
+					headers: {
+						'Content-Type': 'image/png',
+					},
+					mediaId: 'med_staged123',
+					storageKey: 'med_staged123.png',
+					expiresAt: '2026-10-01T00:00:00.000Z',
 				},
 			};
 			const unwrappedTarget = unwrapEnvelope(targetResponse);
 			expect(unwrappedTarget).toEqual({
-				mediaId: 'med_staged123',
 				uploadUrl: 'https://s3.example.com/bucket/key',
 				method: 'PUT',
+				headers: {
+					'Content-Type': 'image/png',
+				},
+				mediaId: 'med_staged123',
+				storageKey: 'med_staged123.png',
+				expiresAt: '2026-10-01T00:00:00.000Z',
 			});
 
 			const dedupResponse = {
+				success: true,
+				data: {
+					existing: true,
+					mediaId: 'med_existing456',
+					storageKey: 'med_existing456.png',
+					url: '/_emdash/api/media/file/med_existing456.png',
+				},
+			};
+			const unwrappedDedup = unwrapEnvelope(dedupResponse);
+			expect(unwrappedDedup).toEqual({
+				existing: true,
+				mediaId: 'med_existing456',
+				storageKey: 'med_existing456.png',
+				url: '/_emdash/api/media/file/med_existing456.png',
+			});
+			/* eslint-enable @n8n/community-nodes/no-hardcoded-secrets */
+		});
+
+		it('documents that direct upload POST /media uses { item, deduplicated: true } unlike staged upload-url', () => {
+			const directUploadDedup = {
 				success: true,
 				data: {
 					item: {
@@ -1031,8 +1062,8 @@ describe('EmDash integration tests', () => {
 					deduplicated: true,
 				},
 			};
-			const unwrappedDedup = unwrapEnvelope(dedupResponse);
-			expect(unwrappedDedup).toEqual({
+			const unwrapped = unwrapEnvelope(directUploadDedup);
+			expect(unwrapped).toEqual({
 				item: {
 					id: 'med_existing456',
 					filename: 'photo.jpg',

@@ -120,7 +120,7 @@ The EmDash community node provides 91 operations across 10 core resources:
 - **Get** (`get`): Get metadata for a media file by ID. Note: `includeUsage` provides a coverage-aware usage summary (`usage.count` is `null` unless caller holds both the RBAC `content:read_drafts` permission and `admin` token scope).
 - **Upload** (`upload`): Upload binary files directly via multipart form data, with optional `fieldId` allowlist targeting, pixel dimensions (`width`, `height`), and LQIP placeholder thumbnail (`thumbnailBinaryPropertyName`).
 - **Replace Image** (`replaceImage`): Replace the binary file of an existing image (`image/jpeg`, `image/png`, or `image/webp`) while preserving its ID, filename, and storage identity. Updates bytes, size, dimensions, and content hash, while invalidating and explicitly resetting `blurhash`, `dominantColor`, and `focalX`/`focalY` to `null` (does not regenerate derived metadata). Requires positive integer `width` and `height`.
-- **Get Upload Target** (`getUploadTarget`): Initiate a staged upload workflow by requesting a pre-signed or direct upload destination for a pending file (`filename`, `contentType`, `size`). When deduplication (`deduplicate: true`) is enabled and a matching checksum is found, the endpoint short-circuits the upload and immediately returns the existing media item.
+- **Get Upload Target** (`getUploadTarget`): Initiate a staged upload workflow by requesting a pre-signed or direct upload destination for a pending file (`filename`, `contentType`, `size`). When deduplication (`deduplicate: true`) is enabled and a matching checksum is found, the endpoint short-circuits the upload and immediately returns `{ existing: true, mediaId, storageKey, url }`.
 - **Upload Pending File** (`uploadPending`): Upload raw binary data directly to the staged upload URL / pending media endpoint (`PUT /media/{id}/upload`) using raw binary streaming (`Content-Type`, `Content-Length`) rather than multipart form data.
 - **Confirm Upload** (`confirmUpload`): Finalize a staged media upload (`POST /media/{id}/confirm`) after binary data has been written, optionally recording validated `size`, `width`, and `height`.
 - **Update Metadata** (`update`): Update media title, alt text, caption, focal points (`focalX` and `focalY` must be provided together between 0.0 and 1.0, or cleared via `clearFocalPoint`/null), positive integer dimensions, or folder (use "unfiled" or empty string to unfile).
@@ -314,7 +314,17 @@ EmDash CMS supports both single-step direct uploads and multi-step staged upload
   - **Step 1: Get Upload Target (`POST /media/upload-url`)**:
     - Registers a pending upload with `filename`, MIME `contentType`, and file `size` in bytes (must be an integer $\ge 0$).
     - Optional fields include `contentHash`, `fieldId`, `deduplicate`, `ensureUniqueFilename`, and `folderId` (passing `'unfiled'` or empty string places the item at root).
-    - **Deduplication short-circuit**: When `deduplicate: true` is enabled and a matching checksum is detected, the EmDash API short-circuits the upload flow and immediately returns the existing media asset (`{ item: { ... }, deduplicated: true }`). In this case, downstream upload and confirmation steps can be bypassed.
+    - **Deduplication short-circuit**: When `deduplicate: true` is enabled and a matching checksum is detected, the EmDash API short-circuits the upload flow and immediately returns the existing media asset:
+      <!-- prettier-ignore -->
+      ```json
+      {
+        "existing": true,
+        "mediaId": "...",
+        "storageKey": "...",
+        "url": "..."
+      }
+      ```
+      In this case, downstream **Upload Pending File** and **Confirm Upload** steps must be skipped.
   - **Step 2: Upload Pending File (`PUT /media/{id}/upload`)**:
     - Writes the raw file binary buffer directly to the pending media endpoint using raw binary streaming (`Content-Type` and `Content-Length` headers). Unlike direct upload, this does not wrap data in multipart form boundaries, maximizing throughput and minimizing memory overhead.
   - **Step 3: Confirm Upload (`POST /media/{id}/confirm`)**:
