@@ -41,7 +41,16 @@ EmDash 1.0.1 defines the following valid PAT scopes: `content:read`, `content:wr
 
 Effective authorization requires both the PAT scope and the user's underlying RBAC role. Scopes required by resource:
 
-- **Content operations**: Read queries (`GET`) require `content:read`. Write and mutation operations (including creation, updates, publish, unpublish, schedule, unschedule, duplicate, restore, and permanent delete) require `content:write`. (EmDash does not use a separate `content:publish` scope).
+- **Content operations**:
+  - Read queries (`GET`) require `content:read`. Write and mutation operations (including creation, updates, publish, unpublish, schedule, unschedule, duplicate, restore, and permanent delete) require `content:write`. (EmDash does not use a separate `content:publish` scope).
+  - **Editorial and collaboration operations**:
+    - **Get Translations**: PAT `content:read`, RBAC `content:read` (non-published variants filtered without `content:read_drafts`).
+    - **Get Authors**: PAT `content:read`, RBAC `content:read_drafts` (editorial draft visibility due to author PII and email).
+    - **Get Trashed**: PAT `content:read`, RBAC `content:read_drafts`.
+    - **Get Edit Lock**: PAT `content:read`, RBAC `content:edit_own` / `content:edit_any`.
+    - **Acquire Edit Lock**: PAT `content:write`, RBAC `content:edit_own` / `content:edit_any`.
+    - **Release Edit Lock**: PAT `content:write`, RBAC `content:edit_own` / `content:edit_any`.
+  - _Important note on token scopes_: There is NO Personal Access Token scope named `content:read_drafts`. Draft visibility is enforced via internal user RBAC role capabilities under the `content:read` PAT scope.
 - **Media operations**: Read queries (`GET`) require `media:read`. Mutations (binary uploads, metadata updates, folder creation, folder rename, and file/folder deletion) require `media:write`.
 - **Menu operations**:
   - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `menus:manage` (which is also implicitly granted by `content:write` or `admin`). EmDash does NOT define `menus:read`, `menu:read`, or `menu:write` as Personal Access Token scopes.
@@ -69,7 +78,7 @@ For incoming event webhooks handled by the **EmDash Trigger** node:
 
 ## Operations
 
-The EmDash community node provides 81 operations across 10 core resources:
+The EmDash community node provides 87 operations across 10 core resources:
 
 ### Comment (6 operations)
 
@@ -80,7 +89,7 @@ The EmDash community node provides 81 operations across 10 core resources:
 - **Bulk Action** (`bulkAction`): Apply moderation action (`approve`, `spam`, `trash`) or permanently delete up to 100 comments in a single request.
 - **Delete** (`delete`): Permanently delete a comment by ID (irreversible).
 
-### Content (16 operations)
+### Content (22 operations)
 
 - **Get Many** (`getAll`): Retrieve entries in a collection with cursor pagination, publication status filtering, and date ranges.
 - **Get** (`get`): Retrieve a single content item by ID or URL slug.
@@ -98,6 +107,12 @@ The EmDash community node provides 81 operations across 10 core resources:
 - **Discard Draft** (`discardDraft`): Discard pending draft edits and revert to live version.
 - **Get Content Terms** (`getContentTerms`): Retrieve taxonomy terms assigned to an entry.
 - **Set Content Terms** (`setContentTerms`): Replace taxonomy term assignments on an entry.
+- **Get Translations** (`getTranslations`): Retrieve translation variants linked to the same translation group.
+- **Get Authors** (`getAuthors`): Retrieve distinct authors of content items within a collection.
+- **Get Trashed** (`getTrashed`): Retrieve soft-deleted content items in a collection with cursor pagination and locale filtering.
+- **Get Edit Lock** (`getLock`): Check current edit lock status and holder information for a content item.
+- **Acquire Edit Lock** (`acquireLock`): Acquire or refresh an edit lock lease on a content item.
+- **Release Edit Lock** (`releaseLock`): Release the caller’s edit lock lease on a content item.
 
 ### Media (11 operations)
 
@@ -282,9 +297,22 @@ Collection, folder, and taxonomy fields use n8n resource locators. You can selec
 
 List operations support EmDash opaque cursor pagination. Set **Return All** to `true` to fetch all available records automatically, or disable it and specify a custom **Limit**.
 
-### Concurrency control
+### Collaborative edit locks and concurrency control
 
-EmDash employs optimistic locking for draft updates and publication actions. Content operations return a revision token (`_rev`). When performing automated updates, pass the current `_rev` to avoid conflicting with concurrent editor changes.
+EmDash provides dual-layer write protection to prevent conflicting edits in multi-user editorial environments:
+
+- **Collaborative edit locks**:
+  - Edit locks coordinate active editing sessions between users and automated workflows to prevent accidental overwrites during active authoring.
+  - Locks currently use a 7-minute lease in EmDash 1.0.1 and expire automatically unless refreshed. Calling **Content → Acquire Edit Lock** on an item already locked by the caller refreshes this lease duration.
+  - **Session tokens (`token`)**: Specify an optional caller session token (up to 128 characters) when acquiring an edit lock. When releasing the lock via **Content → Release Edit Lock**, supplying the same token ensures that one workflow session does not inadvertently release a lock another session still relies on.
+  - **Takeover risk (`takeover: true`)**: Callers must already be authorized to edit the entry (owned content may be authorized through `content:edit_own`, while other content requires `content:edit_any`). Once authorized, enabling `takeover: true` allows the caller to replace the active lock holder. Use this with caution: breaking an active lease will disrupt the current editor's in-flight work.
+- **Relationship between edit locks and `_rev`**:
+  - Edit locks coordinate collaborative presence and in-flight sessions; `_rev` revision tokens provide optimistic concurrency control at write/commit time.
+  - Neither replaces the other: holding an edit lock does not eliminate the need for `_rev` checks during updates, and supplying `_rev` does not bypass an edit lock held by another editor unless `overrideLock: true` is explicitly provided. Workflows should use edit locks to coordinate long-running editorial tasks and pass `_rev` to guarantee data integrity against stale writes.
+
+### Author discovery and privacy
+
+The **Content → Get Authors** operation returns distinct author records for a collection, including author name, user ID, email address, and avatar URL. Workflows that process or forward author information to notifications, external integrations, or analytics platforms must handle these records responsibly and comply with applicable privacy standards (such as GDPR or internal data handling policies).
 
 ### Comment moderation and privacy
 

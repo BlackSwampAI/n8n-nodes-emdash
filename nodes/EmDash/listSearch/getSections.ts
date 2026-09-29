@@ -22,9 +22,10 @@ export async function getSections(
 ): Promise<INodeListSearchResult> {
 	let sections: SectionRecord[] = [];
 
+	const trimmed = filter?.trim() ?? '';
 	const qs: IDataObject = { limit: 100 };
-	if (filter && filter.trim()) {
-		qs.search = filter.trim();
+	if (trimmed) {
+		qs.search = trimmed;
 	}
 
 	try {
@@ -41,8 +42,8 @@ export async function getSections(
 		return { results: [] };
 	}
 
-	if (filter) {
-		const lower = filter.toLowerCase();
+	if (trimmed) {
+		const lower = trimmed.toLowerCase();
 		sections = sections.filter(
 			(section) =>
 				(section.title && section.title.toLowerCase().includes(lower)) ||
