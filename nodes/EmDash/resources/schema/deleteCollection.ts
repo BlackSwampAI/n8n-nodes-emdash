@@ -18,4 +18,3 @@ export const schemaDeleteCollectionDescription: INodeProperties[] = [
 			'Whether to force deletion even if content exists. Permanently deletes the collection schema and underlying content table. Relations involving the collection are also removed.',
 	},
 ];
-

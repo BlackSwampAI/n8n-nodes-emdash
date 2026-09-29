@@ -3926,7 +3926,6 @@ describe('EmDash integration tests', () => {
 					'Permanently deletes the collection schema and underlying content table. Relations involving the collection are also removed.',
 				);
 
-
 				const delRelationProp = node.description.properties.find(
 					(p) => p.name === 'deleteRelation',
 				);
