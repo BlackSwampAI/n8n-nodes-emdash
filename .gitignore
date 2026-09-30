@@ -1,3 +1,8 @@
 dist
 node_modules
 .npm-cache/
+.manual-test.env
+manual-test/
+manual-test-assets/
+*.local
+*.tgz

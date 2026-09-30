@@ -129,23 +129,6 @@ export const menuCreateItemDescription: INodeProperties[] = [
 		},
 	},
 	{
-		displayName: 'Locale',
-		name: 'locale',
-		type: 'string',
-		default: '',
-		displayOptions: {
-			show: showOnlyForMenuCreateItem,
-		},
-		description: 'Target BCP-47 locale code (query parameter)',
-		routing: {
-			request: {
-				qs: {
-					locale: '={{$value || undefined}}',
-				},
-			},
-		},
-	},
-	{
 		displayName: 'Additional Fields',
 		name: 'additionalFields',
 		type: 'collection',
@@ -166,6 +149,20 @@ export const menuCreateItemDescription: INodeProperties[] = [
 						type: 'body',
 						property: 'cssClasses',
 						value: '={{$value || undefined}}',
+					},
+				},
+			},
+			{
+				displayName: 'Locale',
+				name: 'locale',
+				type: 'string',
+				default: '',
+				description: 'Target BCP-47 locale code (query parameter)',
+				routing: {
+					request: {
+						qs: {
+							locale: '={{$value || undefined}}',
+						},
 					},
 				},
 			},

@@ -7,20 +7,22 @@ const showOnlyForContentGetLock = {
 
 export const contentGetLockDescription: INodeProperties[] = [
 	{
-		displayName: 'Locale',
-		name: 'locale',
-		type: 'string',
-		default: '',
+		displayName: 'Options',
+		name: 'options',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
 		displayOptions: {
 			show: showOnlyForContentGetLock,
 		},
-		description: 'BCP-47 locale code to filter by (e.g. en, fr, de)',
-		routing: {
-			request: {
-				qs: {
-					locale: '={{$value || undefined}}',
-				},
+		options: [
+			{
+				displayName: 'Locale',
+				name: 'locale',
+				type: 'string',
+				default: '',
+				description: 'BCP-47 locale code to filter by (e.g. en, fr, de)',
 			},
-		},
+		],
 	},
 ];

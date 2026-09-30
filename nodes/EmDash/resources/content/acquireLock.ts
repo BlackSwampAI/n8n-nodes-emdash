@@ -30,13 +30,22 @@ export const contentAcquireLockDescription: INodeProperties[] = [
 			'Identifies the caller’s editing session. Pass the same token on Release so one session does not unintentionally release a lock another session still relies on.',
 	},
 	{
-		displayName: 'Locale',
-		name: 'locale',
-		type: 'string',
-		default: '',
+		displayName: 'Options',
+		name: 'options',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
 		displayOptions: {
 			show: showOnlyForContentAcquireLock,
 		},
-		description: 'BCP-47 locale code to filter by (e.g. en, fr, de)',
+		options: [
+			{
+				displayName: 'Locale',
+				name: 'locale',
+				type: 'string',
+				default: '',
+				description: 'BCP-47 locale code to filter by (e.g. en, fr, de)',
+			},
+		],
 	},
 ];

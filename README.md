@@ -21,7 +21,7 @@ For additional guidance on managing community nodes, see the [n8n Community Node
 
 | Surface             | Tested baseline    | Notes                                    |
 | ------------------- | ------------------ | ---------------------------------------- |
-| n8n                 | 1.82.0+            | Standard declarative routing and hooks   |
+| n8n                 | 2.30.6             | Exact version used for editor smoke test |
 | EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint     |
 | Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes. |
 

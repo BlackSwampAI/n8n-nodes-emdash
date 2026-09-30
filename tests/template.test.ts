@@ -164,6 +164,12 @@ describe('raw template safety and tooling', () => {
 		expect(publish).toContain('id-token: write');
 		expect(publish).toContain("'v*.*.*'");
 		const [publishJob, verifyPublishedJob = ''] = publish.split(/\n {2}verify-published:\s*\n/);
+		expect(publishJob).toMatch(/actions\/checkout@v6[\s\S]*?fetch-depth:\s*0/);
+		const checkout = publishJob.indexOf('actions/checkout@v6');
+		const releaseTagGate = publishJob.indexOf('node scripts/verify-release-tag.mjs');
+		const setupNode = publishJob.indexOf('actions/setup-node@v6');
+		expect(releaseTagGate).toBeGreaterThan(checkout);
+		expect(releaseTagGate).toBeLessThan(setupNode);
 		expect(verifyPublishedJob).toMatch(/needs:\s*publish/);
 		expect(verifyPublishedJob).toContain('npm ci');
 		expect(verifyPublishedJob).toContain('npm run scan:published');
