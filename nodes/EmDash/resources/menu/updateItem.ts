@@ -7,23 +7,6 @@ const showOnlyForMenuUpdateItem = {
 
 export const menuUpdateItemDescription: INodeProperties[] = [
 	{
-		displayName: 'Locale',
-		name: 'locale',
-		type: 'string',
-		default: '',
-		displayOptions: {
-			show: showOnlyForMenuUpdateItem,
-		},
-		description: 'Target BCP-47 locale code (query parameter)',
-		routing: {
-			request: {
-				qs: {
-					locale: '={{$value || undefined}}',
-				},
-			},
-		},
-	},
-	{
 		displayName: 'Update Fields',
 		name: 'updateFields',
 		type: 'collection',
@@ -71,6 +54,20 @@ export const menuUpdateItemDescription: INodeProperties[] = [
 					send: {
 						type: 'body',
 						property: 'label',
+					},
+				},
+			},
+			{
+				displayName: 'Locale',
+				name: 'locale',
+				type: 'string',
+				default: '',
+				description: 'Target BCP-47 locale code (query parameter)',
+				routing: {
+					request: {
+						qs: {
+							locale: '={{$value || undefined}}',
+						},
 					},
 				},
 			},

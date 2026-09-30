@@ -25,6 +25,7 @@ const readme = read('README.md');
 const releasing = read('RELEASING.md');
 const sourceScanner = read('scripts/scan-source.mjs');
 const publishedScanner = read('scripts/scan-published.mjs');
+const releaseTagVerifier = read('scripts/verify-release-tag.mjs');
 const publishWorkflow = read('.github/workflows/publish.yml');
 const ciWorkflow = read('.github/workflows/ci.yml');
 const brandingTemplate = existsSync(resolve(root, 'docs/branding.md'))
@@ -138,6 +139,31 @@ if (!/timeout-minutes:\s*20/.test(ciWorkflow)) fail('CI must have a 20-minute jo
 if (!/timeout-minutes:\s*30/.test(publishWorkflow))
 	fail('publish must have a 30-minute job timeout');
 const [publishJob, verifyPublishedJob = ''] = publishWorkflow.split(/\n {2}verify-published:\s*\n/);
+const publishCheckout = publishJob.indexOf('actions/checkout@v6');
+const releaseTagGate = publishJob.indexOf('node scripts/verify-release-tag.mjs');
+const publishSetup = publishJob.indexOf('actions/setup-node@v6');
+const publishAuthentication = publishJob.indexOf('node scripts/prepare-npm-auth.mjs');
+const publication = publishJob.indexOf('npm run release');
+if (!/actions\/checkout@v6[\s\S]*?with:\s*\n\s*fetch-depth:\s*0/.test(publishJob))
+	fail('publish checkout must fetch complete branch and tag history');
+if (
+	publishCheckout < 0 ||
+	releaseTagGate < publishCheckout ||
+	publishSetup < releaseTagGate ||
+	publishAuthentication < releaseTagGate ||
+	publication < releaseTagGate
+)
+	fail('release tag verification must run after checkout and before setup/auth/publication');
+for (const invariant of [
+	'GITHUB_REF must exactly match',
+	'release tag must be annotated',
+	'release tag does not resolve to the checked-out HEAD',
+	'refs/remotes/origin/main',
+	'--is-ancestor',
+]) {
+	if (!releaseTagVerifier.includes(invariant))
+		fail(`release tag verifier is missing: ${invariant}`);
+}
 const publishWorkflowPreamble = publishJob.slice(0, publishJob.indexOf('\njobs:'));
 if (/id-token:\s*write/.test(publishWorkflowPreamble))
 	fail('id-token: write must be scoped to the publish job, not the workflow');

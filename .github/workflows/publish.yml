@@ -12,6 +12,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Verify immutable release tag is on reviewed main
+        run: node scripts/verify-release-tag.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: '24'

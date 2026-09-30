@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased
+## 0.1.0
 
-- Refresh the raw template with fail-closed publication safety, strict TypeScript/Vitest tests, comprehensive CI, and provenance-ready release guidance.
-- Add Template 2.0.1 guidance for canonical Black Swamp READMEs, explicit distribution modes, official icon provenance, split npm publication/verification jobs, and narrowly bounded provenance-source propagation retries.
+### Added
+
+- Complete community node integration for EmDash CMS with 103 action operations across 11 core resources:
+  - **Comment** (6 operations): Get Many, Get Counts, Get, Update Status, Bulk Action, Delete.
+  - **Content** (22 operations): Get Many, Get, Create, Update, Delete (soft), Permanent Delete, Restore, Get Trashed, Publish, Unpublish, Schedule, Unschedule, Duplicate, Compare, Discard Draft, Get Translations, Get Authors, Get Lock, Acquire Lock, Release Lock, Get Content Terms, Set Content Terms.
+  - **Media** (15 operations): Get Many, Get, Upload (binary), Update, Delete, Get Usage, Replace Image, Get Upload Target (staged), Upload Pending, Confirm Upload, Get All Folders, Get Folder, Create Folder, Update Folder, Delete Folder.
+  - **Menu** (9 operations): Get Many, Get, Create, Update, Delete, Create Item, Update Item, Delete Item, Reorder Items.
+  - **Redirect** (9 operations): Get All Redirects, Get Redirect, Create Redirect, Update Redirect, Delete Redirect, Get 404 Entries, Get 404 Summary, Prune 404 Log, Clear 404 Log.
+  - **Schema** (12 operations): Get Collections, Get Collection, Create Collection, Update Collection, Delete Collection, Reorder Collections, Get Fields, Get Field, Create Field, Update Field, Delete Field, Reorder Fields.
+  - **Search** (5 operations): Search, Suggest, Get Stats, Enable Search, Rebuild Index.
+  - **Section** (5 operations): Get Many, Get, Create, Update, Delete.
+  - **Settings** (2 operations): Get, Update.
+  - **Taxonomy** (10 operations): Get All Taxonomies, Get Taxonomy, Update Taxonomy, Delete Taxonomy, Get All Terms, Get Term, Create Term, Update Term, Delete Term, Reorder Terms.
+  - **Widget Area** (8 operations): Get Many, Get, Create, Delete, Create Widget, Update Widget, Delete Widget, Reorder Widgets.
+- Standalone **EmDash Trigger** node supporting real-time webhook events (`content:create`, `content:update`, `content:delete`, `media:upload`) with Bearer token authentication.
+- Comprehensive credential support for **EmDash API** (Personal Access Token) and **EmDash Webhook** (shared secret).
+- Declarative routing with `preSend` validation hooks, `postReceive` envelope unwrapping, cursor pagination, and optimistic concurrency (`_rev`) support.
+- Interactive dynamic resource locators (`listSearch`) with manual fallback (`By Slug` / `By ID`) for write-only token environments.
+
+### Changed
+
+- Differentiated the EmDash action and trigger registrations and aligned their scoped n8n metadata.
+- Exposed comment status as a direct operation control and grouped applicable content locale controls
+  under options for a clearer editor experience.
+- Added a fail-closed publish guard requiring the annotated version tag to resolve to the checked-out
+  commit and remain in reviewed `origin/main` history.

@@ -371,32 +371,65 @@ describe('EmDash integration tests', () => {
 			expect(limit?.routing?.send?.property).toBe('limit');
 			expect(limit?.routing?.output?.maxResults).toBe('={{$value}}');
 
-			const locale = node.description.properties.find(
+			const trashedOptions = node.description.properties.find(
 				(p) =>
-					p.name === 'locale' &&
+					p.name === 'options' &&
 					p.displayOptions?.show?.resource?.includes('content') &&
 					p.displayOptions?.show?.operation?.includes('getTrashed'),
 			);
-			expect(locale).toBeDefined();
-			expect(locale?.default).toBe('');
-			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
-		});
-
-		it('configures getLock with locale query parameter', () => {
-			const locale = node.description.properties.find(
-				(p) =>
-					p.name === 'locale' &&
-					p.displayOptions?.show?.resource?.includes('content') &&
-					p.displayOptions?.show?.operation?.includes('getLock'),
+			expect(trashedOptions).toBeDefined();
+			const locale = (trashedOptions?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
 			);
 			expect(locale).toBeDefined();
 			expect(locale?.default).toBe('');
-			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+			const trashedOp = getOperation('getTrashed');
+			expect(trashedOp?.routing?.request?.qs?.locale).toBe(
+				'={{$parameter.options?.locale || $parameter.locale || undefined}}',
+			);
 		});
 
-		it('configures acquireLock with locale query parameter, body parameters, and operation routing', () => {
+		it('configures get and getLock with locale query parameter in options and operation routing', () => {
+			const getOptions = node.description.properties.find(
+				(p) =>
+					p.name === 'options' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('get'),
+			);
+			expect(getOptions).toBeDefined();
+			const getLocale = (getOptions?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
+			expect(getLocale).toBeDefined();
+			expect(getLocale?.default).toBe('');
+			const getOp = getOperation('get');
+			expect(getOp?.routing?.request?.qs?.locale).toBe(
+				'={{$parameter.options?.locale || $parameter.locale || undefined}}',
+			);
+
+			const lockOptions = node.description.properties.find(
+				(p) =>
+					p.name === 'options' &&
+					p.displayOptions?.show?.resource?.includes('content') &&
+					p.displayOptions?.show?.operation?.includes('getLock'),
+			);
+			expect(lockOptions).toBeDefined();
+			const lockLocale = (lockOptions?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
+			expect(lockLocale).toBeDefined();
+			expect(lockLocale?.default).toBe('');
+			const lockOp = getOperation('getLock');
+			expect(lockOp?.routing?.request?.qs?.locale).toBe(
+				'={{$parameter.options?.locale || $parameter.locale || undefined}}',
+			);
+		});
+
+		it('configures acquireLock with locale query parameter in options, body parameters, and operation routing', () => {
 			const acquireOp = getOperation('acquireLock');
-			expect(acquireOp?.routing?.request?.qs?.locale).toBe('={{$parameter.locale || undefined}}');
+			expect(acquireOp?.routing?.request?.qs?.locale).toBe(
+				'={{$parameter.options?.locale || $parameter.locale || undefined}}',
+			);
 			const acquireBody = acquireOp?.routing?.request?.body as Record<string, unknown> | undefined;
 			expect(acquireBody?.takeover).toBe(
 				'={{$parameter.takeover !== undefined ? $parameter.takeover : undefined}}',
@@ -423,27 +456,38 @@ describe('EmDash integration tests', () => {
 			expect(token?.type).toBe('string');
 			expect(token?.default).toBe('');
 
-			const locale = node.description.properties.find(
+			const acquireOptions = node.description.properties.find(
 				(p) =>
-					p.name === 'locale' &&
+					p.name === 'options' &&
 					p.displayOptions?.show?.resource?.includes('content') &&
 					p.displayOptions?.show?.operation?.includes('acquireLock'),
+			);
+			expect(acquireOptions).toBeDefined();
+			const locale = (acquireOptions?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
 			);
 			expect(locale).toBeDefined();
 			expect(locale?.type).toBe('string');
 			expect(locale?.default).toBe('');
 		});
 
-		it('configures releaseLock with locale and token query parameters', () => {
-			const locale = node.description.properties.find(
+		it('configures releaseLock with locale options and token query parameters', () => {
+			const releaseOptions = node.description.properties.find(
 				(p) =>
-					p.name === 'locale' &&
+					p.name === 'options' &&
 					p.displayOptions?.show?.resource?.includes('content') &&
 					p.displayOptions?.show?.operation?.includes('releaseLock'),
 			);
+			expect(releaseOptions).toBeDefined();
+			const locale = (releaseOptions?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
 			expect(locale).toBeDefined();
 			expect(locale?.default).toBe('');
-			expect(locale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+			const releaseOp = getOperation('releaseLock');
+			expect(releaseOp?.routing?.request?.qs?.locale).toBe(
+				'={{$parameter.options?.locale || $parameter.locale || undefined}}',
+			);
 
 			const token = node.description.properties.find(
 				(p) =>
@@ -1882,7 +1926,27 @@ describe('EmDash integration tests', () => {
 			expect(commentLimit?.routing?.output?.maxResults).toBe('={{$value}}');
 		});
 
-		it('configures comment getAll filters (collection, status, search)', () => {
+		it('configures comment getAll status parameter and filters (collection, search)', () => {
+			const statusProp = node.description.properties.find(
+				(p) =>
+					p.name === 'status' &&
+					p.displayOptions?.show?.resource?.includes('comment') &&
+					p.displayOptions?.show?.operation?.includes('getAll'),
+			);
+			expect(statusProp).toBeDefined();
+			expect(statusProp?.type).toBe('options');
+			expect(statusProp?.default).toBe('pending');
+			const statusOpts = (statusProp?.options as Array<{ name: string; value: string }>).map(
+				(o) => o.value,
+			);
+			expect(statusOpts).toEqual(['pending', 'approved', 'spam', 'trash']);
+			expect(statusProp?.routing?.request?.qs?.status).toBe('={{$value}}');
+
+			const getAllOp = getOperation('getAll');
+			expect(getAllOp?.routing?.request?.qs?.status).toBe(
+				'={{$parameter.status || $parameter.filters?.status || "pending"}}',
+			);
+
 			const filters = node.description.properties.find(
 				(p) =>
 					p.name === 'filters' &&
@@ -1904,20 +1968,13 @@ describe('EmDash integration tests', () => {
 			);
 			expect(collectionFilter?.routing?.request?.qs?.collection).toBeDefined();
 
-			const statusFilter = filterOptions.find((f) => f.name === 'status');
-			expect(statusFilter).toBeDefined();
-			expect(statusFilter?.type).toBe('options');
-			expect(statusFilter?.default).toBe('any');
-			const statusOpts = (statusFilter?.options as Array<{ name: string; value: string }>).map(
-				(o) => o.value,
-			);
-			expect(statusOpts).toEqual(['any', 'approved', 'pending', 'spam', 'trash']);
-			expect(statusFilter?.routing?.request?.qs?.status).toBeDefined();
-
 			const searchFilter = filterOptions.find((f) => f.name === 'search');
 			expect(searchFilter).toBeDefined();
 			expect(searchFilter?.type).toBe('string');
 			expect(searchFilter?.routing?.request?.qs?.search).toBeDefined();
+
+			const statusFilter = filterOptions.find((f) => f.name === 'status');
+			expect(statusFilter).toBeUndefined();
 		});
 
 		it('configures updateStatus status parameter options', () => {
@@ -2245,27 +2302,57 @@ describe('EmDash integration tests', () => {
 		});
 
 		it('places locale query parameter across 8 operations and body parameter on create', () => {
-			const queryOperations = [
+			const optionsCollectionOps = [
 				'getAll',
 				'get',
 				'update',
 				'delete',
-				'createItem',
-				'updateItem',
 				'deleteItem',
 				'reorderItems',
 			];
 
-			for (const op of queryOperations) {
-				const localeProp = node.description.properties.find(
+			for (const op of optionsCollectionOps) {
+				const optionsProp = node.description.properties.find(
 					(p) =>
-						p.name === 'locale' &&
+						p.name === 'options' &&
 						p.displayOptions?.show?.resource?.includes('menu') &&
 						p.displayOptions?.show?.operation?.includes(op),
 				);
-				expect(localeProp, `locale property should exist for ${op}`).toBeDefined();
+				expect(optionsProp, `options collection should exist for ${op}`).toBeDefined();
+				const localeProp = (optionsProp?.options as INodeProperties[])?.find(
+					(o) => o.name === 'locale',
+				);
+				expect(localeProp, `locale option should exist for ${op}`).toBeDefined();
 				expect(localeProp?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
 			}
+
+			// updateItem has locale in updateFields collection
+			const updateFields = node.description.properties.find(
+				(p) =>
+					p.name === 'updateFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('updateItem'),
+			);
+			expect(updateFields).toBeDefined();
+			const updateItemLocale = (updateFields?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
+			expect(updateItemLocale).toBeDefined();
+			expect(updateItemLocale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
+
+			// createItem has locale in additionalFields collection
+			const createItemAdditional = node.description.properties.find(
+				(p) =>
+					p.name === 'additionalFields' &&
+					p.displayOptions?.show?.resource?.includes('menu') &&
+					p.displayOptions?.show?.operation?.includes('createItem'),
+			);
+			expect(createItemAdditional).toBeDefined();
+			const createItemLocale = (createItemAdditional?.options as INodeProperties[])?.find(
+				(o) => o.name === 'locale',
+			);
+			expect(createItemLocale).toBeDefined();
+			expect(createItemLocale?.routing?.request?.qs?.locale).toBe('={{$value || undefined}}');
 
 			// create operation has locale in request body via additionalFields
 			const createAdditional = node.description.properties.find(

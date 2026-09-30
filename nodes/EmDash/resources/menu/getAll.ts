@@ -7,20 +7,29 @@ const showOnlyForMenuGetAll = {
 
 export const menuGetAllDescription: INodeProperties[] = [
 	{
-		displayName: 'Locale',
-		name: 'locale',
-		type: 'string',
-		default: '',
+		displayName: 'Options',
+		name: 'options',
+		type: 'collection',
+		placeholder: 'Add Option',
+		default: {},
 		displayOptions: {
 			show: showOnlyForMenuGetAll,
 		},
-		description: 'Filter menus by BCP-47 locale code (e.g. en, fr, de)',
-		routing: {
-			request: {
-				qs: {
-					locale: '={{$value || undefined}}',
+		options: [
+			{
+				displayName: 'Locale',
+				name: 'locale',
+				type: 'string',
+				default: '',
+				description: 'Filter menus by BCP-47 locale code (e.g. en, fr, de)',
+				routing: {
+					request: {
+						qs: {
+							locale: '={{$value || undefined}}',
+						},
+					},
 				},
 			},
-		},
+		],
 	},
 ];

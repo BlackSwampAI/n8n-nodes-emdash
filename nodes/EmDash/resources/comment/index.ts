@@ -100,6 +100,9 @@ export const commentDescription: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '/admin/comments',
+						qs: {
+							status: '={{$parameter.status || $parameter.filters?.status || "pending"}}',
+						},
 					},
 					output: {
 						postReceive: [

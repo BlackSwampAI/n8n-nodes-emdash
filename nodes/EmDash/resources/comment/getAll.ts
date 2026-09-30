@@ -53,6 +53,30 @@ export const commentGetAllDescription: INodeProperties[] = [
 		description: 'Max number of results to return',
 	},
 	{
+		displayName: 'Status',
+		name: 'status',
+		type: 'options',
+		displayOptions: {
+			show: showOnlyForCommentGetAll,
+		},
+		options: [
+			{ name: 'Pending', value: 'pending' },
+			{ name: 'Approved', value: 'approved' },
+			{ name: 'Spam', value: 'spam' },
+			{ name: 'Trash', value: 'trash' },
+		],
+		default: 'pending',
+		description:
+			'Moderation status to list comments for. EmDash organizes comments into status-based moderation queues; defaults to Pending.',
+		routing: {
+			request: {
+				qs: {
+					status: '={{$value}}',
+				},
+			},
+		},
+	},
+	{
 		displayName: 'Filters',
 		name: 'filters',
 		type: 'collection',
@@ -107,27 +131,6 @@ export const commentGetAllDescription: INodeProperties[] = [
 					request: {
 						qs: {
 							search: '={{$value || undefined}}',
-						},
-					},
-				},
-			},
-			{
-				displayName: 'Status',
-				name: 'status',
-				type: 'options',
-				options: [
-					{ name: 'Any', value: 'any' },
-					{ name: 'Approved', value: 'approved' },
-					{ name: 'Pending', value: 'pending' },
-					{ name: 'Spam', value: 'spam' },
-					{ name: 'Trash', value: 'trash' },
-				],
-				default: 'any',
-				description: 'Filter comments by moderation status',
-				routing: {
-					request: {
-						qs: {
-							status: '={{$value === "any" || !$value ? undefined : $value}}',
 						},
 					},
 				},

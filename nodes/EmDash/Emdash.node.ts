@@ -79,7 +79,7 @@ export class Emdash implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-		description: 'Consume and manage content and media from EmDash CMS',
+		description: 'Consume and manage content and media from EmDash CMS (Action)',
 		defaults: {
 			name: 'EmDash',
 		},

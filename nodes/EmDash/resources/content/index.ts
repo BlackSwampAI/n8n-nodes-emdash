@@ -47,7 +47,7 @@ export const contentDescription: INodeProperties[] = [
 						method: 'POST',
 						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
 						qs: {
-							locale: '={{$parameter.locale || undefined}}',
+							locale: '={{$parameter.options?.locale || $parameter.locale || undefined}}',
 						},
 						body: {
 							takeover: '={{$parameter.takeover !== undefined ? $parameter.takeover : undefined}}',
@@ -185,6 +185,9 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}',
+						qs: {
+							locale: '={{$parameter.options?.locale || $parameter.locale || undefined}}',
+						},
 					},
 					output: {
 						postReceive: [
@@ -251,6 +254,9 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+						qs: {
+							locale: '={{$parameter.options?.locale || $parameter.locale || undefined}}',
+						},
 					},
 					output: {
 						postReceive: [
@@ -317,6 +323,9 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'GET',
 						url: '=/content/{{$parameter.collection}}/trash',
+						qs: {
+							locale: '={{$parameter.options?.locale || $parameter.locale || undefined}}',
+						},
 					},
 					output: {
 						postReceive: [
@@ -383,6 +392,9 @@ export const contentDescription: INodeProperties[] = [
 					request: {
 						method: 'DELETE',
 						url: '=/content/{{$parameter.collection}}/{{$parameter.id}}/lock',
+						qs: {
+							locale: '={{$parameter.options?.locale || $parameter.locale || undefined}}',
+						},
 					},
 					output: {
 						postReceive: [

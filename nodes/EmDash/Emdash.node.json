@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-emdash.emdash",
+	"node": "@blackswampai/n8n-nodes-emdash.emdash",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Developer Tools"],

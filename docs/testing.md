@@ -1,5 +1,68 @@
 # Testing strategy for EmDash integration
 
+## Observed release-hardening evidence — 2026-09-30
+
+The follow-up release-hardening run produced the following direct evidence:
+
+- Vitest passed all 327 tests on local Node 24 and Node 22.23.2. The Node 22 run does not prove the
+  exact declared CI minimum of 22.22.0; CI remains responsible for that lane.
+- Lint, strict typecheck, build, official source and built-package scanner preflight, package checks,
+  compiled registration load, and disposable packed-tarball installation/load all passed.
+- A fresh packed package loaded in isolated n8n 2.30.6 with one scoped **EmDash** registration and
+  one scoped **EmDash Trigger** registration. n8n also generated its expected **EmDash Tool** entry.
+  No duplicate registrations from `N8N_CUSTOM_EXTENSIONS` were present.
+- Both n8n icon HTTP routes returned status 200 and the bytes of the official EmDash assets. This is
+  HTTP and asset-byte evidence, not a visual editor check.
+- Real n8n executions succeeded for one read operation in every resource: `comment.getCounts`,
+  `content.getAll`, `media.getAll`, `menu.getAll`, `redirect.getAllRedirects`,
+  `schema.getCollections`, `search.search`, `section.getAll`, `settings.get`,
+  `taxonomy.getAllTaxonomies`, and `widgetArea.getAll`.
+- Trigger HTTP/runtime checks observed: missing and wrong authorization returned 401; malformed input
+  returned 400; selected-event and collection-filter exclusions returned 200 without an execution;
+  a valid request returned 200 with a successful downstream execution; restart preserved activation;
+  deactivation returned 404; wildcard selection delivered all four supported event types; and a
+  content-only collection filter did not filter media events.
+- Duplicate `Authorization` headers were normalized by n8n/Node to the first value. An invalid first
+  value returned 401 without execution; a valid first value returned 200 with successful execution.
+  This does not demonstrate rejection of raw duplicate headers.
+
+### Open dependency audit item
+
+An online `npm audit --json` run on 2026-09-30 reported 24 findings: 17 high, 7 moderate, and 0
+critical. These findings span development/release tooling and the locally installed `n8n-workflow`
+tree, including `axios`. Passing lint, tests, build, the official community-package scanner, and
+package-boundary checks does not mean this dependency audit passed. npm's proposed remedies include
+major-version changes or downgrades to `@n8n/node-cli` and the scanner, plus a `release-it` upgrade;
+they require a separate dependency review and authorization before material dependency changes.
+
+The published package manifest declares no bundled runtime dependencies, and `n8n-workflow` remains
+a host-provided peer. No dependency versions changed during this release-hardening work. Do not apply
+`npm audit fix --force` as an unreviewed release fix.
+
+The original disposable lab was then repaired and restarted from the tested tarball. Live discovery
+again showed exactly the scoped **EmDash**, **EmDash Trigger**, and generated **EmDash Tool** entries,
+with no custom-extension duplicates; both icon routes returned 200 with bytes matching the official
+assets. Before repair, the SQLite database and `.manual-test.env` were backed up. Only the existing
+notifier URL fields and environment URL were corrected to include the final `/webhook` segment. Both
+saved copies of `01 - EmDash Trigger Verification` were repaired through the n8n CLI with events
+`['*']`, blank `collectionFilter`, stable `webhookId`, and the **EmDash Local Lab Webhook** credential
+attached; both remain inactive. All other saved workflows and the original execution count were
+preserved. The lab was observed running on ports 4321, 5680, and 5681, with the primary n8n ports
+untouched.
+
+At candidate handoff, the task's manual lab and disposable test services were stopped and ports 4321,
+5680, and 5681 were verified closed. The user's primary n8n service and ports were preserved.
+
+The full EmDash Webhook Notifier-to-n8n path remains untested locally. EmDash core outbound SSRF
+protection blocks the loopback destination despite the notifier development flag. Test this on the
+public droplet by attaching the EmDash Webhook credential to the active workflow, copying n8n's
+generated HTTPS production URL into the notifier, and configuring the same shared token in both.
+
+Browser automation was unavailable. Visual node-picker differentiation, rendered icons, and dynamic
+dropdown behavior remain pending human checks; server metadata and icon HTTP responses do not satisfy
+those checks. This follow-up did not execute all 103 action operations. It also performed no npm
+publication, published-package verification, GitHub release, or Creator Portal verification.
+
 ## Unit and contract tests
 
 - Use strict TypeScript `*.test.ts` files under Vitest.

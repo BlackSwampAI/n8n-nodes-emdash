@@ -137,7 +137,7 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 				primaryDocumentation: { url: string }[];
 			};
 		};
-		expect(manifest.node).toBe('n8n-nodes-emdash.emdashTrigger');
+		expect(manifest.node).toBe('@blackswampai/n8n-nodes-emdash.emdashTrigger');
 		expect(manifest.nodeVersion).toBe('1.0');
 		expect(manifest.codexVersion).toBe('1.0');
 		expect(manifest.categories).toEqual(['Developer Tools']);
