@@ -140,7 +140,7 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 		expect(manifest.node).toBe('@blackswampai/n8n-nodes-emdash.emdashTrigger');
 		expect(manifest.nodeVersion).toBe('1.0');
 		expect(manifest.codexVersion).toBe('1.0');
-		expect(manifest.categories).toEqual(['Developer Tools']);
+		expect(manifest.categories).toEqual(['Marketing & Content']);
 		expect(manifest.resources.credentialDocumentation[0].url).toBe(
 			'https://github.com/emdash-cms/emdash#readme',
 		);

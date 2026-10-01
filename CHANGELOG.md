@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+### Changed
+
+- Updated the EmDash action and trigger codex categories to the supported **Marketing & Content**
+  category required by the current n8n community-package scanner.
+- Updated the pinned official n8n community-package scanner to 0.38.0.
+
 ## 0.1.0
 
 ### Added

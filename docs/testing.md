@@ -1,5 +1,26 @@
 # Testing strategy for EmDash integration
 
+## 0.1.1 scanner compatibility — 2026-09-30
+
+The 0.1.1 release changes both codex manifests from the unsupported **Developer Tools** category to the
+supported **Marketing & Content** category and pins the official scanner at 0.38.0. The action node
+remains declarative, using routing, expressions, pagination, `preSend`, and `postReceive`; the trigger
+remains programmatic because it implements incoming webhook lifecycle and filtering behavior.
+
+Release validation covers a frozen install, formatting, lint, strict typecheck, Vitest, build, the
+official scanner against source and built JavaScript, dry-run package checks, compiled registration
+loading, and isolated packed-package installation. All passed locally: 327 Vitest tests passed; the
+package boundary contained 394 files (100,619 packed bytes and 705,944 unpacked bytes); and both
+compiled nodes with both wired credential types loaded from the package registrations and from an
+isolated tarball consumer.
+
+A fresh packed 0.1.1 package in isolated n8n 2.30.6 executed `schema.getCollections` against a local
+HTTP API fixture. The fixture observed the authenticated request, and n8n returned the normalized
+collection output. Discovery showed exactly one scoped action and trigger registration. The trigger
+rejected missing authorization with 401, accepted a valid event with 200, and produced exactly one
+successful downstream execution. All run-owned services stopped afterward. This is real-n8n runtime
+evidence with a fixture API; it does not establish new browser or hosted EmDash behavior.
+
 ## Observed release-hardening evidence — 2026-09-30
 
 The follow-up release-hardening run produced the following direct evidence:

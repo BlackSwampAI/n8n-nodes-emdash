@@ -1,6 +1,6 @@
 {
 	"name": "@blackswampai/n8n-nodes-emdash",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"packageManager": "npm@11.19.0",
 	"description": "n8n community node integration for EmDash CMS",
 	"license": "MIT",
@@ -58,7 +58,7 @@
 	},
 	"devDependencies": {
 		"@n8n/node-cli": "0.46.4",
-		"@n8n/scan-community-package": "0.34.0",
+		"@n8n/scan-community-package": "0.38.0",
 		"eslint": "9.39.4",
 		"prettier": "3.8.3",
 		"release-it": "20.2.0",

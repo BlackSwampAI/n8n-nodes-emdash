@@ -6,22 +6,22 @@ Releases are user-authorized and publish only from `.github/workflows/publish.ym
 
 Complete the README initialization checklist. `npm run release:check` enters template mode only when the normalized git origin is exactly this template repository. Every generated repository uses normal mode and must have final identity, no placeholders/examples, and no `private: true`.
 
-## 0.1.0 candidate handoff
+## 0.1.1 candidate handoff
 
-The package and changelog versions are already `0.1.0`. As checked on 2026-09-30, the package/version
-is new on npm (`E404`), neither the local nor remote repository has a `v0.1.0` tag, and the public
-repository's default branch is `main`.
+The package and changelog versions are `0.1.1`. This patch updates both codex manifests to the
+supported **Marketing & Content** category and pins the official community-package scanner at 0.38.0.
+It does not change the API, node runtime, implementation style, or dependencies shipped at runtime.
 
 Before tagging, review this candidate, merge it to `main`, and require the exact resulting `main`
-commit to pass CI on Node 22.22.0 and Node 24. Create the annotated `v0.1.0` tag only on that reviewed
-commit after explicit user authorization. The release-tag guard rejects a tag on this off-main
-candidate branch. Pushing, tagging, publishing, and creating a release require explicit user
-authorization.
+commit to pass CI on Node 22.22.0 and Node 24. Create the annotated `v0.1.1` tag only on that reviewed
+commit after explicit user authorization. The release-tag guard rejects a tag on an off-main candidate
+branch. Pushing, tagging, publishing, and creating a release require explicit user authorization.
 
-For this brand-new package only, the user supplies `NPM_TOKEN` as the narrowly scoped first-release
-bootstrap secret. Never place a token in repository files, commands, documentation values, or logs.
-After a successful first publication, replace the bootstrap secret with npm Trusted Publishing and
-revoke the temporary token as described below.
+This existing package publishes through npm Trusted Publishing. The GitHub publish job must retain
+`id-token: write`, and the npm Trusted Publisher must match the exact GitHub owner, repository,
+`publish.yml` workflow, and declared environment (none). The repository must not contain or require an
+`NPM_TOKEN` secret for this release. The authentication helper still preserves narrowly scoped token
+bootstrap support for repositories that genuinely require a first publication.
 
 Open limitations remain part of the release decision: public-droplet Webhook Notifier delivery and
 human browser smoke for node-picker/icon presentation and dynamic dropdowns are pending. The online
@@ -58,9 +58,9 @@ Inspect the dry-run tarball and install it in a disposable n8n instance. Verify 
 
 Every API credential should provide a harmless authenticated test request where the service supports one. Add a product-specific release invariant so the credential cannot remain registered but disconnected from every node.
 
-## First publication only
+## Trusted Publishing and first-publication fallback
 
-npm requires a package to exist before Trusted Publisher configuration. For a genuinely new package, create a narrowly scoped, temporary granular token with publish access only to that package and store it only as the `NPM_TOKEN` Actions secret. After explicit user approval, tag the reviewed commit with an annotated immutable `v0.1.0` tag and let GitHub Actions publish with provenance. The tagged commit must already be contained in `origin/main`; a tag on an unmerged release branch is rejected.
+npm requires a package to exist before Trusted Publisher configuration. Existing packages such as this one use OIDC with no `NPM_TOKEN`. For a genuinely new package only, create a narrowly scoped, temporary granular token with publish access only to that package and store it only as the `NPM_TOKEN` Actions secret. After explicit user approval, tag the reviewed commit with an annotated immutable version tag and let GitHub Actions publish with provenance. The tagged commit must already be contained in `origin/main`; a tag on an unmerged release branch is rejected.
 
 Immediately after success, configure npm Trusted Publishing for the exact GitHub owner, repository, `publish.yml`, and no environment unless the workflow declares one. Delete the GitHub secret and revoke the token. Existing packages skip token bootstrap and use OIDC from the first release.
 

@@ -11,7 +11,7 @@ const packageSpec = `${name}@${version}`;
 const attempts = 6;
 
 for (let attempt = 1; attempt <= attempts; attempt += 1) {
-	const result = spawnSync('npx', ['--yes', '@n8n/scan-community-package@0.34.0', packageSpec], {
+	const result = spawnSync('npx', ['--yes', '@n8n/scan-community-package@0.38.0', packageSpec], {
 		cwd: root,
 		encoding: 'utf8',
 	});
