@@ -4701,6 +4701,10 @@ describe('EmDash integration tests', () => {
 	});
 
 	describe('resource and operation counts', () => {
+		it('uses the shared integration description', () => {
+			expect(node.description.description).toBe('Work with EmDash content, media, and events');
+		});
+
 		it('registers 11 resources in resource options sorted alphabetically', () => {
 			const resourceProp = node.description.properties.find((p) => p.name === 'resource');
 			const options = resourceProp?.options as INodePropertyOptions[];

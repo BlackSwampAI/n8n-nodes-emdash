@@ -1,5 +1,87 @@
 # Testing strategy for EmDash integration
 
+## Paired action/trigger picker convention — unreleased
+
+n8n 2.30.6 bundles `n8n-editor-ui` 2.30.4. Its action generator removes `Trigger` from a trigger's
+internal name, groups a matching action and trigger under one service entry, combines their choices,
+and uses the trigger description for the grouped service. The selection records retain the original
+node identifiers and defaults. This is the same naming relationship used by the official built-in
+`airtable` and `airtableTrigger` nodes; the EmDash description wording is integration-specific and is
+not claimed as an exact copy of Airtable metadata.
+
+The focused fixture in `tests/fixtures/n8n-picker-2.30.6.ts` models the relevant behavior from the
+[pinned picker source](https://github.com/n8n-io/n8n/blob/n8n%402.30.6/packages/frontend/editor-ui/src/features/shared/nodeCreator/composables/useActionsGeneration.ts).
+It also records the official
+[Airtable action](https://github.com/n8n-io/n8n/blob/n8n%402.30.6/packages/nodes-base/nodes/Airtable/Airtable.node.ts)
+and
+[Airtable trigger](https://github.com/n8n-io/n8n/blob/n8n%402.30.6/packages/nodes-base/nodes/Airtable/AirtableTrigger.node.ts)
+as naming references without importing or copying their polling implementation.
+
+The regression contract expects one grouped EmDash service with 108 choices: 103 **Actions**
+selections targeting `emdash` with resource/operation values and 5 **Triggers** selections targeting
+`emdashTrigger` with event arrays. The underlying visible node types remain separate, with default
+canvas names **EmDash** and **EmDash Trigger**. The grouped description intentionally comes from the
+trigger because that is current upstream behavior. Both EmDash node descriptions use **Work with
+EmDash content, media, and events**, which makes that fallback broad enough for the combined service.
+The fixture models upstream grouping and description fallback; it is source-level evidence, not
+visual verification. The user subsequently confirmed the grouped picker wording manually in the
+port 5690 lab on n8n 2.30.6 / `n8n-editor-ui` 2.30.4 with package 0.1.1 and Node 24.18.0. No
+screenshots were available, and that acceptance does not cover dynamic options, icons, or service API
+behavior.
+
+Local validation passed formatting, lint, strict typecheck, all 333 Vitest tests, build, official
+source and built-package scanner preflight, package checks, compiled registration loading, and an
+isolated packed-package install/load. The package boundary returned to the expected 394 files, with
+only the original two nodes and two credential types loaded. The install smoke's sandboxed attempt
+could not spawn npm; its approved escalated rerun passed.
+
+The packed 0.1.1 candidate also passed an independent loopback runtime smoke on Node 24.18.0 with
+n8n 2.30.6, `n8n-editor-ui` 2.30.4, and official scanner 0.38.0. The original `emdash` action sent an
+authenticated `schema.getCollections` request to a local API fixture and returned normalized output.
+The original `emdashTrigger` workflow imported and published in the disposable instance; missing
+authorization returned 401, a collection-filtered request returned 200 without execution, and a
+valid request returned 200 with one successful downstream execution. All run-owned services stopped
+afterward.
+
+The full pinned upstream generator produced one EmDash group with 108 selections retaining the two
+original EmDash targets. Running the same generator against installed official Airtable metadata
+produced one Airtable group with 9 selections retaining its action and trigger targets, and confirmed
+the trigger-description fallback. These are source-level and local-fixture runtime results. They do
+not establish behavior against an actual EmDash server or notifier, or visual editor acceptance. The
+computer inventory contained no connected apps or browsers, so screenshots remain unavailable. The
+later human picker check supplies the visual acceptance for this wording change.
+
+The existing manual profile was backed up and preserved while its port 5690 lab was refreshed from
+the candidate tarball (SHA-256
+`70141c341cfdd20fa4a2df30c35185760a9aad5232f551609efa6381f2177782`). The settings endpoint and
+editor root both returned 200. Installed metadata reported the two original visible types, the exact
+shared description, and default names **EmDash** and **EmDash Trigger**. At that stage, the lab used
+only loopback ports 5690 and 5691; disposable smoke ports 5692 and 5693 were stopped, and the existing
+default-port n8n process was untouched. After the user's manual picker check, the port 5690 lab was
+stopped at the user's request; its profile remains preserved. The HTTP and metadata checks are not
+the source of visual acceptance.
+
+## Template-managed development launcher
+
+`npm run dev -- --custom-user-folder /tmp/n8n-node-run` starts the pinned node CLI through the
+cross-platform operational script `scripts/dev.mjs`, forces `N8N_PORT=5690`, preserves the process
+environment, and forwards additional arguments. Open `http://localhost:5690` manually because the
+pinned CLI shortcut can open 5678. If 5690 is occupied, bypass the wrapper explicitly with
+`N8N_PORT=5692 npm exec -- n8n-node dev --custom-user-folder /tmp/n8n-node-run` and open port 5692.
+Do not stop or restart an existing service on 5678. The `.mjs` launcher and Discord notifier are
+direct-execution operational/release tools; automated repository tests remain TypeScript Vitest
+files.
+
+The actual launcher smoke ran `npm run dev` with a unique temporary user folder and an inherited
+`N8N_PORT=5678`. The wrapper forced port 5690 and n8n's broker used 5691. With Node 24.18.0,
+`@n8n/node-cli` 0.46.4, and cached n8n 2.41.5, the offline run reached **Editor is now accessible**;
+`/healthz` returned 200 and `/rest/settings` returned JSON with status 200 on `127.0.0.1:5690`. No
+download or upgrade occurred. A run-owned process-group `SIGINT` stopped the wrapper, CLI, and n8n
+cleanly, ports 5690 and 5691 were free afterward, and the existing service on 5678 retained the same
+process ID. This verifies launcher port enforcement and cleanup only; it does not establish EmDash
+node discovery, picker behavior, API execution, or general support for n8n 2.41.5. The separate human
+picker acceptance remains the n8n 2.30.6 result recorded above.
+
 ## 0.1.1 scanner compatibility — 2026-09-30
 
 The 0.1.1 release changes both codex manifests from the unsupported **Developer Tools** category to the

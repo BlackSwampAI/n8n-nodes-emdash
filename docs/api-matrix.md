@@ -202,10 +202,20 @@ The webhook endpoint verifies the caller using a shared secret token:
 
 - **Manual registration**: EmDash CMS does not provide a public REST API for dynamically creating or managing webhook subscriptions. Webhook destinations are manually configured by site administrators in the EmDash dashboard.
 - **Single-webhook limitation**: The official notifier stores one destination webhook URL per site. Multiple workflows reacting to CMS events should branch downstream in n8n from a single trigger workflow.
+- **Picker grouping**: n8n groups visible `emdash` and `emdashTrigger` choices under one EmDash
+  service entry by removing `Trigger` from the trigger identifier, matching the convention used by
+  the built-in Airtable action/trigger pair. Action selections still instantiate `emdash`; event
+  selections instantiate `emdashTrigger`. Their node-specific default names remain **EmDash** and
+  **EmDash Trigger**. Current n8n uses the trigger description for the grouped service description,
+  so both nodes use the broad shared wording **Work with EmDash content, media, and events**.
 
 ### Implementation Style and AGENTS.md Exception
 
-- **Style**: Programmatic trigger (`webhook(this: IWebhookFunctions)`).
+- **Action style**: All 103 ordinary REST operations remain declarative through routing,
+  expressions, pagination, `preSend`, and `postReceive` hooks.
+- **Trigger style**: Programmatic trigger (`webhook(this: IWebhookFunctions)`). Airtable's polling
+  implementation is not copied; EmDash requires the existing incoming webhook lifecycle, bearer
+  verification, payload validation, and server-side filtering.
 - **Justification**: Documented concrete exception under repository rules in AGENTS.md. Incoming webhook endpoints, header-based bearer verification, payload validation, and server-side filtering cannot be implemented as declarative REST actions and require programmatic execution in the n8n webhook lifecycle.
 
 ### Runtime Evidence and Compatibility Notes

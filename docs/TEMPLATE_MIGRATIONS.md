@@ -4,6 +4,30 @@ GitHub creates a new repository from a snapshot of this template. Generated repo
 
 The current reusable baseline and canonical source repository are recorded in `.blackswamp/template.json`. Keep that file after generation so maintainers can compare their adopted version with future template releases. Updating the marker alone is not a migration: review the template diff, adopt each relevant script, workflow, test, or documentation change, run every local gate, and then update the marker in the generated repository.
 
+## 2.2.0
+
+- Added an optional, read-only Discord notification job after successful npm publication and published-package verification. Configure `DISCORD_WEBHOOK` as a repository Actions secret to enable it; notification failures remain isolated from the immutable release.
+- Routed `npm run dev` through a cross-platform Node launcher that explicitly sets `N8N_PORT=5690`, preserving the CLI's isolated user folder and forwarded arguments while avoiding an existing n8n service on 5678.
+- Documented manual browser navigation to `http://localhost:5690`, since the pinned CLI shortcut still opens 5678, and an explicit `N8N_PORT=5692 npm exec -- n8n-node dev --custom-user-folder /tmp/n8n-node-run` alternative when 5690 is occupied.
+
+Generated repositories adopting this migration should copy the launcher, notification script, tests, and workflow job; add `DISCORD_WEBHOOK` only when notifications are desired; and update their local smoke instructions. Review the workflow permissions and run the full validation suite before updating `.blackswamp/template.json` to `2.2.0`.
+
+## 2.1.1
+
+- Updated the pinned official n8n community-package scanner from 0.34.0 to 0.38.0 in package
+  metadata, release invariants, tests, and the fail-closed published-package wrapper.
+- Required codex manifests to use a category supported by scanner 0.38.0. Generated repositories
+  using an unsupported category such as **Developer Tools** must select the supported category that
+  accurately describes their integration; do not copy a category without reviewing product fit.
+- Kept the scanner's aliased TypeScript 6 dependency nested beneath the scanner in the lockfile so it
+  cannot replace the project's pinned TypeScript 5.9 `tsc` executable during `npm ci`.
+
+Generated repositories adopting this migration should update each active scanner pin, regenerate the
+lockfile without upgrading unrelated dependencies, inspect every `*.node.json` category against the
+current supported vocabulary, and verify that `node_modules/.bin/tsc` resolves to the project's pinned
+compiler after a fresh frozen install. Run the full validation suite before updating
+`.blackswamp/template.json` to `2.1.1`.
+
 ## 2.1.0
 
 - Made declarative routing the required starting point for ordinary REST API nodes, including an explicit evaluation of routing, expressions, pagination, `preSend`, and `postReceive`.
