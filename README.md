@@ -19,11 +19,11 @@ For additional guidance on managing community nodes, see the [n8n Community Node
 
 ## Compatibility
 
-| Surface             | Tested baseline    | Notes                                    |
-| ------------------- | ------------------ | ---------------------------------------- |
-| n8n                 | 2.30.6             | Exact version used for editor smoke test |
-| EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint     |
-| Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes. |
+| Surface             | Tested baseline    | Notes                                                     |
+| ------------------- | ------------------ | --------------------------------------------------------- |
+| n8n                 | 2.30.6             | Runtime, picker-source, and user-verified picker baseline |
+| EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint                      |
+| Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes.                  |
 
 ## Credentials
 
@@ -228,6 +228,14 @@ The EmDash community node provides 103 operations across 11 core resources:
 ## Trigger
 
 The **EmDash Trigger** node (`emdashTrigger`) starts workflows automatically when content or media events occur in your EmDash CMS site.
+
+n8n groups the **EmDash** action and trigger choices under one EmDash service entry, following the
+same paired-node naming convention as its built-in Airtable integration. Action choices create an
+**EmDash** node; event choices create an **EmDash Trigger** node. Their workflow type identifiers
+remain `emdash` and `emdashTrigger`.
+
+The shared service description is **Work with EmDash content, media, and events**, so the grouped card
+describes both action and trigger choices.
 
 ### Supported Events
 
@@ -470,6 +478,11 @@ The Widget Area resource manages theme-registered and custom widget zones and th
   - **RBAC Capabilities**: The authenticated user must separately possess the `widgets:read` role capability for reads, and `widgets:manage` capability (Editor or Administrator) for mutations.
 
 ## Troubleshooting
+
+For local development, run `npm run dev -- --custom-user-folder /tmp/n8n-node-run` and open
+`http://localhost:5690` manually. The pinned CLI browser shortcut can open port 5678 instead. If 5690
+is occupied, use
+`N8N_PORT=5692 npm exec -- n8n-node dev --custom-user-folder /tmp/n8n-node-run` and open port 5692.
 
 - **Token permissions**: Ensure your Personal Access Token includes the required scopes for the operations invoked. Operations that modify system settings (such as index rebuilds, search enablement, or redirect/404 management) require the `admin` scope.
 - **Base URL and routing**: Enter the bare root URL of your EmDash installation (for example, `https://cms.example.com`). The node automatically normalizes trailing slashes and prefixes paths with `/_emdash/api`.

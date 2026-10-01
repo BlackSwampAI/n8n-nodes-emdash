@@ -19,7 +19,7 @@ export class EmdashTrigger implements INodeType {
 		group: ['trigger'],
 		version: 1,
 		subtitle: '={{"Trigger: " + $parameter["events"].join(", ")}}',
-		description: 'Trigger: Starts the workflow when EmDash content or media events occur',
+		description: 'Work with EmDash content, media, and events',
 		defaults: {
 			name: 'EmDash Trigger',
 		},

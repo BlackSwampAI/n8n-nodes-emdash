@@ -13,6 +13,8 @@
 	"include": [
 		"credentials/**/*",
 		"nodes/**/*",
+		"scripts/dev.mjs",
+		"scripts/notify-discord.mjs",
 		"scripts/prepare-npm-auth.mjs",
 		"scripts/verify-release-tag.mjs",
 		"scripts/scan-policy.mjs",

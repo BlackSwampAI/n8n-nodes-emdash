@@ -76,12 +76,13 @@ describe('raw template safety and tooling', () => {
 		};
 		expect(marker).toEqual({
 			schemaVersion: 1,
-			templateVersion: '2.1.0',
+			templateVersion: '2.2.0',
 			sourceRepository: 'https://github.com/christopherjnelson/n8n-community-node-template',
 		});
 		const migrations = await read('docs/TEMPLATE_MIGRATIONS.md');
 		expect(migrations).toContain('Generated repositories do not inherit later template changes');
-		expect(migrations).toContain('## 2.1.0');
+		expect(migrations).toContain('## 2.2.0');
+		expect(migrations).toContain('scanner 0.38.0');
 		expect(migrations).toContain('declarative routing');
 	});
 
@@ -137,7 +138,7 @@ describe('raw template safety and tooling', () => {
 			read('package.json'),
 		]);
 		expect(releaseCheck).toContain('TEMPLATE_ORIGIN');
-		expect(releaseCheck).toContain("templateMarker.templateVersion !== '2.1.0'");
+		expect(releaseCheck).toContain("templateMarker.templateVersion !== '2.2.0'");
 		expect(releaseCheck).toContain(
 			"const canonicalExample = 'dist/nodes/GithubIssues/GithubIssues.node.js'",
 		);
@@ -190,6 +191,10 @@ describe('raw template safety and tooling', () => {
 			expect(workflow).toContain('npm run smoke:install');
 		}
 		expect(publish).toContain('node scripts/prepare-npm-auth.mjs');
+		expect(publish).toContain('needs: [publish, verify-published]');
+		expect(publish).toContain('secrets.DISCORD_WEBHOOK');
+		expect(publish).toContain('node scripts/notify-discord.mjs');
+		expect(packageJsonText).toContain('"dev": "node scripts/dev.mjs"');
 		expect(packageJsonText).toContain('"scan:source"');
 		expect(await read('scripts/node-load-smoke.mjs')).toContain(
 			'Packaged SVG icon needs a usable viewBox',

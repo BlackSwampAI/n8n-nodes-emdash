@@ -89,6 +89,7 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 		const instance = new EmdashTrigger();
 		expect(instance.description.name).toBe('emdashTrigger');
 		expect(instance.description.displayName).toBe('EmDash Trigger');
+		expect(instance.description.description).toBe('Work with EmDash content, media, and events');
 		expect(instance.description.group).toEqual(['trigger']);
 		expect(instance.description.version).toBe(1);
 		expect(instance.description.inputs).toEqual([]);

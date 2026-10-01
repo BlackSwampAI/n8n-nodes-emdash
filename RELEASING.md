@@ -6,14 +6,21 @@ Releases are user-authorized and publish only from `.github/workflows/publish.ym
 
 Complete the README initialization checklist. `npm run release:check` enters template mode only when the normalized git origin is exactly this template repository. Every generated repository uses normal mode and must have final identity, no placeholders/examples, and no `private: true`.
 
-## 0.1.1 candidate handoff
+## 0.1.2 release handoff
 
-The package and changelog versions are `0.1.1`. This patch updates both codex manifests to the
-supported **Marketing & Content** category and pins the official community-package scanner at 0.38.0.
-It does not change the API, node runtime, implementation style, or dependencies shipped at runtime.
+The package and changelog versions are `0.1.2`. This patch gives the grouped EmDash action and
+trigger picker an accurate shared description and adopts the reviewed template 2.2.0 development
+launcher and optional Discord release notification. It preserves the original node identifiers,
+registrations, credentials, 103 action operations, five trigger event choices, webhook behavior,
+implementation styles, dependencies, and runtime API behavior.
+
+The user manually accepted the grouped picker wording on n8n 2.30.6 / `n8n-editor-ui` 2.30.4 with
+package 0.1.1 and Node 24.18.0. The 0.1.2 candidate retains the same node runtime implementation and
+changes release/development tooling plus metadata wording. This acceptance does not cover icons,
+dynamic dropdowns, an actual EmDash server, or end-to-end Webhook Notifier delivery.
 
 Before tagging, review this candidate, merge it to `main`, and require the exact resulting `main`
-commit to pass CI on Node 22.22.0 and Node 24. Create the annotated `v0.1.1` tag only on that reviewed
+commit to pass CI on Node 22.22.0 and Node 24. Create the annotated `v0.1.2` tag only on that reviewed
 commit after explicit user authorization. The release-tag guard rejects a tag on an off-main candidate
 branch. Pushing, tagging, publishing, and creating a release require explicit user authorization.
 
@@ -23,11 +30,12 @@ This existing package publishes through npm Trusted Publishing. The GitHub publi
 `NPM_TOKEN` secret for this release. The authentication helper still preserves narrowly scoped token
 bootstrap support for repositories that genuinely require a first publication.
 
-Open limitations remain part of the release decision: public-droplet Webhook Notifier delivery and
-human browser smoke for node-picker/icon presentation and dynamic dropdowns are pending. The online
-dependency audit also remains open with 17 high and 7 moderate findings; passing package gates does
-not waive those findings. Resolve material dependency changes only through a separate reviewed and
-authorized dependency update.
+The user has authorized the 0.1.2 release through completion. The primary orchestrator owns the
+reviewed-main merge/tag gate, publication, and post-publication verification. Public-droplet Webhook
+Notifier delivery, icon presentation, and dynamic dropdown browser checks remain unverified. The
+inherited online dependency audit also remains open with 17 high and 7 moderate findings; passing
+package gates does not waive those findings. Resolve material dependency changes only through a
+separate reviewed and authorized dependency update.
 
 ## Prepublication gate
 
@@ -65,6 +73,13 @@ npm requires a package to exist before Trusted Publisher configuration. Existing
 Immediately after success, configure npm Trusted Publishing for the exact GitHub owner, repository, `publish.yml`, and no environment unless the workflow declares one. Delete the GitHub secret and revoke the token. Existing packages skip token bootstrap and use OIDC from the first release.
 
 The workflow removes setup-node's literal empty `_authToken=${NODE_AUTH_TOKEN}` line before tokenless publishing. Do not remove this preparation: an empty auth placeholder can suppress OIDC.
+
+After both publication and published-package verification succeed, the optional `notify-discord`
+job posts one bounded release notification when the existing `DISCORD_WEBHOOK` Actions secret is
+configured. It has read-only repository permission, receives no npm token or OIDC permission, and
+uses `continue-on-error` so a notification failure cannot alter the immutable release result. Never
+send a live test notification as part of repository validation; transport behavior is covered by
+mocked Vitest contracts.
 
 ## Verify and preserve history
 

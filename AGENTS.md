@@ -19,6 +19,7 @@
 - At the start of implementation, verify the expected branch with `git status --short --branch`. If it differs from the assignment, stop before editing and report it.
 - Treat the assignment's allowed files as an allowlist. Review `git diff --name-only` before handoff and revert only task-created out-of-scope changes.
 - Send a concise checkpoint before a command or investigation can leave the user without an update for 60 seconds. Bound unsupported browser, Docker, and external-tool attempts; report evidence and limitations instead of retrying indefinitely.
+- Launch the template-managed development instance with `npm run dev -- --custom-user-folder /tmp/n8n-node-run`, open `http://localhost:5690` manually, and if 5690 is occupied report the conflict instead of silently falling back; use `N8N_PORT=5692 npm exec -- n8n-node dev --custom-user-folder /tmp/n8n-node-run` only as an explicit alternative, and never attach to, stop, or restart an existing service on 5678.
 - Automated tests are TypeScript `*.test.ts` files run with Vitest. Reserve `.mjs` for genuine direct-execution operational or release tooling; document exceptions.
 - Keep `n8n-workflow` host-provided and avoid runtime dependencies. Use package scripts for validation, including lint, strict typecheck, tests, build, and package checks.
 - Follow `RELEASING.md`; the user authorizes releases and performs final review/merge.

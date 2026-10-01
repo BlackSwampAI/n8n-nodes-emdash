@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2
+
+### Changed
+
+- Adopted the reviewed n8n community-node template 2.2.0 development launcher and optional,
+  read-only post-release Discord notification job without changing dependencies or runtime node
+  behavior.
+- Set the EmDash action and trigger metadata to the shared description **Work with EmDash content,
+  media, and events**. This keeps n8n's built-in paired-node grouping while making its grouped-card
+  description accurate for both roles. Both original node types retain their identifiers, canvas
+  names, operations, events, visibility, and behavior.
+
 ## 0.1.1
 
 ### Changed
