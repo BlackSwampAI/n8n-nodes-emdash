@@ -1,5 +1,56 @@
 # Testing strategy for EmDash integration
 
+## Picker-separation regression — unreleased
+
+n8n 2.30.6 bundles `n8n-editor-ui` 2.30.4. Its action generator normalizes a trigger internal name by
+removing `Trigger`, then merges the trigger into a matching action type. With `emdash` and
+`emdashTrigger`, this produced one **EmDash** picker entry containing 108 selections (103 actions and
+5 event selections, including All Events) and replaced the action description with the trigger
+description. The picker also removes `Trigger` from display names when a node has multiple actions.
+
+The regression fixture in `tests/fixtures/n8n-picker-2.30.6.ts` models those exact relevant source
+expressions from the installed source maps. The official `n8n@2.30.6` source for
+`useActionsGeneration.ts` byte-matched the installed source-map copy (SHA-256
+`18ffdc287067f63298070ba1d2558c5ae6afeab3f77e57f191ada9accd035d83`); the extracted
+`NodeItem.vue` source has SHA-256
+`55de3c7c7719ce7f4c4e164aa57c6d0071bdc8ec1e57b1beac52c2e751dd7eb9`. Tests verify hidden legacy
+compatibility, distinct normalization, 103 action operations, five event selections including All
+Events (four concrete webhook event types), and the picker-equivalent labels **EmDash** and **EmDash
+Webhook**. This is source-level regression evidence, not browser acceptance. Visual picker and canvas
+checks remain pending.
+
+### Completed picker-separation validation
+
+The orchestrator performed a frozen `npm ci --ignore-scripts --no-audit --no-fund` on Node 24.18.0
+with npm 11.16.0. Formatting, lint, strict typecheck, all 335 Vitest tests, build, official scanner
+0.38.0 against source and built JavaScript, package checks, compiled registration loading, and the
+isolated packed-package install/load smoke then passed. Sandbox restrictions blocked Git fixture
+subprocesses in the release-tag Vitest tests and npm subprocesses in the install smoke; escalated
+reruns passed. The before-fix manual lab had package 0.1.0 installed, while the candidate tarball came
+from the unreleased repository 0.1.1 tree and had shasum
+`a3865d213c5e724adf70ea8dad6ec760fd39413f`. No package version was bumped or published.
+
+The full upstream action generator, executed against that fresh tarball, produced two entries. The
+**EmDash** entry retained the action description and 103 selections targeting `emdash`; the **EmDash
+Webhook** entry retained the trigger description and 5 event selections targeting
+`emdashWebhookTrigger`. Their default canvas names were **EmDash** and **EmDash Trigger**.
+
+A disposable n8n 2.30.6 instance (`n8n-editor-ui` 2.30.4, host `n8n-workflow` 2.30.2) installed the
+same tarball. Its server node types exposed the hidden legacy `emdashTrigger`, visible
+`emdashWebhookTrigger`, visible action registration, and preserved generated **EmDash Tool**. The
+action's `schema.getCollections` operation sent an authenticated request to the fixture and returned
+normalized output. Unchanged legacy-trigger and new-trigger workflows were imported and published
+only in the disposable instance. For both trigger identifiers, missing authorization returned 401,
+a collection-filtered request returned 200 without execution, and a valid request returned 200. The
+valid requests produced exactly two successful downstream executions, one for each trigger type. All
+run-owned services were stopped afterward.
+
+This proves direct HTTP fixture behavior and registration compatibility; it does not prove visual
+picker search, node details, icons, or canvas rendering. No browser was connected and the in-app
+browser was unavailable, so before/after screenshots and visual acceptance remain pending. Full
+EmDash Webhook Notifier-to-n8n delivery also remains pending. The exact Node 22 lane remains a CI
+gate, and the previously documented dependency-audit findings are unchanged.
+
 ## 0.1.1 scanner compatibility — 2026-09-30
 
 The 0.1.1 release changes both codex manifests from the unsupported **Developer Tools** category to the

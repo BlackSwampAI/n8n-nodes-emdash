@@ -1,0 +1,18 @@
+{
+	"node": "@blackswampai/n8n-nodes-emdash.emdashWebhookTrigger",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Marketing & Content"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://github.com/emdash-cms/emdash#readme"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://blackswampai.com/n8n-nodes/emdash/"
+			}
+		]
+	}
+}

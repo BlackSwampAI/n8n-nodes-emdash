@@ -53,7 +53,8 @@
 		],
 		"nodes": [
 			"dist/nodes/EmDash/Emdash.node.js",
-			"dist/nodes/EmDash/EmdashTrigger.node.js"
+			"dist/nodes/EmDash/EmdashTrigger.node.js",
+			"dist/nodes/EmDash/EmdashWebhookTrigger.node.js"
 		]
 	},
 	"devDependencies": {

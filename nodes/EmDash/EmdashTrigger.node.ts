@@ -17,6 +17,7 @@ export class EmdashTrigger implements INodeType {
 		name: 'emdashTrigger',
 		icon: { light: 'file:../../icons/emdash.svg', dark: 'file:../../icons/emdash.dark.svg' },
 		group: ['trigger'],
+		hidden: true,
 		version: 1,
 		subtitle: '={{"Trigger: " + $parameter["events"].join(", ")}}',
 		description: 'Trigger: Starts the workflow when EmDash content or media events occur',

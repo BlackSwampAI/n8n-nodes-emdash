@@ -19,11 +19,11 @@ For additional guidance on managing community nodes, see the [n8n Community Node
 
 ## Compatibility
 
-| Surface             | Tested baseline    | Notes                                    |
-| ------------------- | ------------------ | ---------------------------------------- |
-| n8n                 | 2.30.6             | Exact version used for editor smoke test |
-| EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint     |
-| Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes. |
+| Surface             | Tested baseline    | Notes                                                                         |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| n8n                 | 2.30.6             | Runtime and source-level picker baseline; visual editor acceptance is pending |
+| EmDash CMS          | v1 (emdash@1.0.1+) | Cloudflare Workers REST API endpoint                                          |
+| Node.js development | 22.22.0 and 24     | CI and package checks run on both lanes.                                      |
 
 ## Credentials
 
@@ -227,7 +227,12 @@ The EmDash community node provides 103 operations across 11 core resources:
 
 ## Trigger
 
-The **EmDash Trigger** node (`emdashTrigger`) starts workflows automatically when content or media events occur in your EmDash CMS site.
+Choose **EmDash Webhook** in the node picker to add the webhook trigger. Its workflow node is named
+**EmDash Trigger** on the canvas and uses the `emdashWebhookTrigger` type identifier. Workflows saved
+with the earlier `emdashTrigger` identifier remain compatible and load with the same webhook behavior,
+but that legacy registration is hidden from new-node discovery.
+
+The **EmDash Trigger** node starts workflows automatically when content or media events occur in your EmDash CMS site.
 
 ### Supported Events
 

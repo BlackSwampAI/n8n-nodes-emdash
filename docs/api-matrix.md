@@ -114,7 +114,7 @@ Also verify path encoding, identifiers and response wrappers, list pagination, e
 
 ## Trigger / Event Contract
 
-The EmDash integration includes an event-driven trigger node (`emdashTrigger`) that responds to webhooks dispatched by the official EmDash webhook notifier plugin.
+The EmDash integration includes an event-driven trigger node (`emdashWebhookTrigger`) that responds to webhooks dispatched by the official EmDash webhook notifier plugin. The earlier `emdashTrigger` identifier remains registered with `hidden: true` so saved workflows retain their identifier and behavior; it is excluded from new-node discovery.
 
 ### Upstream Notifier Package
 
@@ -205,13 +205,16 @@ The webhook endpoint verifies the caller using a shared secret token:
 
 ### Implementation Style and AGENTS.md Exception
 
-- **Style**: Programmatic trigger (`webhook(this: IWebhookFunctions)`).
+- **Action style**: The 103 ordinary REST operations remain declarative, using routing, expressions,
+  pagination, `preSend`, and `postReceive` hooks.
+- **Trigger style**: Programmatic trigger (`webhook(this: IWebhookFunctions)`). The visible
+  `emdashWebhookTrigger` class reuses the legacy implementation without duplicating webhook logic.
 - **Justification**: Documented concrete exception under repository rules in AGENTS.md. Incoming webhook endpoints, header-based bearer verification, payload validation, and server-side filtering cannot be implemented as declarative REST actions and require programmatic execution in the n8n webhook lifecycle.
 
 ### Runtime Evidence and Compatibility Notes
 
 - Tested and verified against EmDash CMS v1 (`emdash@1.0.1+`) and `@emdash-cms/plugin-webhook-notifier@0.2.2`.
-- Export class name `EmdashTrigger` matches node loader conventions derived from `EmdashTrigger.node.ts`, and re-exports `EmDashTrigger` for alias compatibility.
+- Export class name `EmdashTrigger` matches node loader conventions derived from `EmdashTrigger.node.ts`, and re-exports `EmDashTrigger` for alias compatibility. The visible `EmdashWebhookTrigger` registration uses the fully qualified identifier `@blackswampai/n8n-nodes-emdash.emdashWebhookTrigger`, the **Marketing & Content** codex category, the picker label **EmDash Webhook**, and the default canvas name **EmDash Trigger**.
 - Trigger outputs an unnested item payload directly into the workflow execution data pipeline: `{ workflowData: [this.helpers.returnJsonArray([body])] }`.
 - Content event collection filtering performs case-sensitive matching with whitespace trimming; media upload events bypass collection filtering.
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Changed the action and webhook-trigger registration metadata to prevent n8n's internal-name
+  normalization from merging them. The supported picker labels are **EmDash** and **EmDash Webhook**;
+  visual acceptance remains pending. Existing workflows keep loading through the hidden
+  `emdashTrigger` registration, while newly added triggers use `emdashWebhookTrigger` and retain
+  **EmDash Trigger** as the canvas name.
+
 ## 0.1.1
 
 ### Changed

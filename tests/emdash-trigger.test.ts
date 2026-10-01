@@ -5,6 +5,10 @@ import { NodeConnectionTypes, type IDataObject, type IWebhookFunctions } from 'n
 import { describe, expect, it, vi } from 'vitest';
 import { EmDashWebhook } from '../credentials/EmDashWebhook.credentials';
 import { EmdashTrigger, EmDashTrigger } from '../nodes/EmDash/EmdashTrigger.node';
+import {
+	EmdashWebhookTrigger,
+	EmDashWebhookTrigger,
+} from '../nodes/EmDash/EmdashWebhookTrigger.node';
 
 const readJson = async (path: string) =>
 	JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), 'utf8'));
@@ -90,6 +94,7 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 		expect(instance.description.name).toBe('emdashTrigger');
 		expect(instance.description.displayName).toBe('EmDash Trigger');
 		expect(instance.description.group).toEqual(['trigger']);
+		expect(instance.description.hidden).toBe(true);
 		expect(instance.description.version).toBe(1);
 		expect(instance.description.inputs).toEqual([]);
 		expect(instance.description.outputs).toEqual([NodeConnectionTypes.Main]);
@@ -102,6 +107,30 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 				path: 'webhook',
 			},
 		]);
+	});
+
+	it('exposes a visible picker registration with the legacy runtime behavior', () => {
+		expect(EmDashWebhookTrigger).toBe(EmdashWebhookTrigger);
+		const legacy = new EmdashTrigger();
+		const visible = new EmdashWebhookTrigger();
+		expect(visible.description).toMatchObject({
+			name: 'emdashWebhookTrigger',
+			displayName: 'EmDash Webhook Trigger',
+			defaults: { name: 'EmDash Trigger' },
+		});
+		expect(visible.description.hidden).toBeUndefined();
+		expect(visible.description.credentials).toEqual(legacy.description.credentials);
+		expect(visible.description.webhooks).toEqual(legacy.description.webhooks);
+		expect(visible.description.properties).toEqual(legacy.description.properties);
+		expect(Object.keys(visible.webhookMethods.default)).toEqual(
+			Object.keys(legacy.webhookMethods.default),
+		);
+		for (const method of ['checkExists', 'create', 'delete'] as const) {
+			expect(visible.webhookMethods.default[method].toString()).toBe(
+				legacy.webhookMethods.default[method].toString(),
+			);
+		}
+		expect(visible.webhook).toBe(legacy.webhook);
 	});
 
 	it('configures EmDashWebhook credential type correctly', () => {
@@ -123,7 +152,21 @@ describe('EmDash Trigger packaging & loader requirements', () => {
 			n8n: { nodes: string[]; credentials: string[] };
 		};
 		expect(packageJson.n8n.nodes).toContain('dist/nodes/EmDash/EmdashTrigger.node.js');
+		expect(packageJson.n8n.nodes).toContain('dist/nodes/EmDash/EmdashWebhookTrigger.node.js');
 		expect(packageJson.n8n.credentials).toContain('dist/credentials/EmDashWebhook.credentials.js');
+	});
+
+	it('matches EmdashWebhookTrigger.node.json manifest requirements', async () => {
+		const manifest = (await readJson('nodes/EmDash/EmdashWebhookTrigger.node.json')) as {
+			node: string;
+			nodeVersion: string;
+			codexVersion: string;
+			categories: string[];
+		};
+		expect(manifest.node).toBe('@blackswampai/n8n-nodes-emdash.emdashWebhookTrigger');
+		expect(manifest.nodeVersion).toBe('1.0');
+		expect(manifest.codexVersion).toBe('1.0');
+		expect(manifest.categories).toEqual(['Marketing & Content']);
 	});
 
 	it('matches EmdashTrigger.node.json manifest requirements', async () => {
