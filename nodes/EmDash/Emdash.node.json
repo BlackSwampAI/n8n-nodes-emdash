@@ -2,7 +2,7 @@
 	"node": "@blackswampai/n8n-nodes-emdash.emdash",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
-	"categories": ["Developer Tools"],
+	"categories": ["Marketing & Content"],
 	"resources": {
 		"credentialDocumentation": [
 			{

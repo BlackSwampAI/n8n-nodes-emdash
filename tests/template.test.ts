@@ -19,7 +19,7 @@ describe('raw template safety and tooling', () => {
 		expect(packageJson.engines.node).toBe('>=22.22.0');
 		expect(packageJson.devDependencies).toMatchObject({
 			'@n8n/node-cli': '0.46.4',
-			'@n8n/scan-community-package': '0.34.0',
+			'@n8n/scan-community-package': '0.38.0',
 			eslint: '9.39.4',
 			prettier: '3.8.3',
 			'release-it': '20.2.0',

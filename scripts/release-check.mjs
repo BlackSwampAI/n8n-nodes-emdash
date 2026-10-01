@@ -92,8 +92,8 @@ if (packageJson.scripts?.test !== 'vitest run') fail('test must run Vitest');
 if (!packageJson.scripts?.typecheck?.includes('tsconfig.test.json'))
 	fail('typecheck must include strict test TypeScript');
 if (packageJson.devDependencies?.vitest !== '4.1.11') fail('Vitest must be pinned to 4.1.11');
-if (packageJson.devDependencies?.['@n8n/scan-community-package'] !== '0.34.0')
-	fail('official community scanner must be pinned to 0.34.0');
+if (packageJson.devDependencies?.['@n8n/scan-community-package'] !== '0.38.0')
+	fail('official community scanner must be pinned to 0.38.0');
 if (packageJson.packageManager !== 'npm@11.19.0') fail('packageManager must pin npm@11.19.0');
 try {
 	const templateMarker = JSON.parse(read('.blackswamp/template.json'));

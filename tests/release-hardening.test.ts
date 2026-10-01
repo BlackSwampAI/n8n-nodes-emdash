@@ -52,11 +52,11 @@ describe('npm authentication preparation', () => {
 });
 
 describe('published scanner retry policy', () => {
-	const packageSpec = '@blackswampai/n8n-nodes-emdash@0.1.0';
+	const packageSpec = '@blackswampai/n8n-nodes-emdash@0.1.1';
 
 	it('retries only observed propagation failures for the expected version', () => {
 		const analysis404 = `Package ${packageSpec} has failed security checks\nReason: Analysis failed: Request failed with status code 404`;
-		const missingVersion = `Package ${packageSpec} has failed security checks\nReason: No package metadata found for version 0.1.0`;
+		const missingVersion = `Package ${packageSpec} has failed security checks\nReason: No package metadata found for version 0.1.1`;
 		const provenanceSource404 = `Package ${packageSpec} has failed security checks\nReason: Could not fetch the source repository recorded in the package's npm provenance (Request failed with status code 404).`;
 		expect(isLikelyPropagationFailure(analysis404, packageSpec)).toBe(true);
 		expect(isLikelyPropagationFailure(missingVersion, packageSpec)).toBe(true);
@@ -81,7 +81,7 @@ describe('published scanner retry policy', () => {
 			'Reason: Analysis failed: Request failed with status code 403',
 			'Reason: Analysis failed: Request failed with status code 429',
 			'Reason: Could not fetch source repository (Request failed with status code 404)',
-			'Reason: Package metadata is invalid for version 0.1.0',
+			'Reason: Package metadata is invalid for version 0.1.1',
 			'Reason: No package metadata found for version 0.0.9',
 		]) {
 			const output = `Package ${packageSpec} has failed security checks\n${reason}`;
