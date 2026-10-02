@@ -2,11 +2,8 @@ import type { INodeProperties } from 'n8n-workflow';
 import { commentIdProperty } from '../../shared/descriptions';
 import { validateBulkCommentAction } from '../../shared/transport';
 import { commentGetAllDescription } from './getAll';
-import { commentGetCountsDescription } from './getCounts';
-import { commentGetDescription } from './get';
 import { commentUpdateStatusDescription } from './updateStatus';
 import { commentBulkActionDescription } from './bulkAction';
-import { commentDeleteDescription } from './delete';
 
 const showOnlyForComment = {
 	resource: ['comment'],
@@ -165,9 +162,6 @@ export const commentDescription: INodeProperties[] = [
 	},
 	commentIdProperty,
 	...commentGetAllDescription,
-	...commentGetCountsDescription,
-	...commentGetDescription,
 	...commentUpdateStatusDescription,
 	...commentBulkActionDescription,
-	...commentDeleteDescription,
 ];
