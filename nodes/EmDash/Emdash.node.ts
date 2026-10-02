@@ -134,5 +134,3 @@ export class Emdash implements INodeType {
 		},
 	};
 }
-
-export { Emdash as EmDash };

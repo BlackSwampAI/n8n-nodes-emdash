@@ -8,6 +8,17 @@ import type {
 	IHttpRequestOptions,
 } from 'n8n-workflow';
 import { normalizeBaseUrl } from './utils';
+import { encodeMultipart, type MultipartPart } from './multipart';
+
+function setMultipartContentType(requestOptions: IHttpRequestOptions, contentType: string): void {
+	requestOptions.headers = requestOptions.headers ?? {};
+	for (const header of Object.keys(requestOptions.headers)) {
+		if (header.toLowerCase() === 'content-type') {
+			delete requestOptions.headers[header];
+		}
+	}
+	requestOptions.headers['Content-Type'] = contentType;
+}
 
 export interface EmDashErrorPayload {
 	code: string;
@@ -276,11 +287,9 @@ export async function prepareMediaUpload(
 		}
 	}
 
-	const formData = new FormData();
 	const mimeType = binaryData?.mimeType || 'application/octet-stream';
 	const fileName = binaryData?.fileName || 'file';
-	const blob = new Blob([dataBuffer as unknown as Uint8Array<ArrayBuffer>], { type: mimeType });
-	formData.append('file', blob, fileName);
+	const parts: MultipartPart[] = [{ fieldName: 'file', data: dataBuffer, fileName, mimeType }];
 
 	if (thumbnailBinaryPropertyName) {
 		let thumbBinaryData: { fileName?: string; mimeType?: string };
@@ -301,36 +310,36 @@ export async function prepareMediaUpload(
 
 		const thumbMimeType = thumbBinaryData?.mimeType || 'application/octet-stream';
 		const thumbFileName = thumbBinaryData?.fileName || 'thumbnail';
-		const thumbBlob = new Blob([thumbBuffer as unknown as Uint8Array<ArrayBuffer>], {
-			type: thumbMimeType,
+		parts.push({
+			fieldName: 'thumbnail',
+			data: thumbBuffer,
+			fileName: thumbFileName,
+			mimeType: thumbMimeType,
 		});
-		formData.append('thumbnail', thumbBlob, thumbFileName);
 	}
 
 	if (folderId) {
-		formData.append('folderId', folderId);
+		parts.push({ fieldName: 'folderId', value: folderId });
 	}
 	if (deduplicate !== undefined) {
-		formData.append('deduplicate', String(deduplicate));
+		parts.push({ fieldName: 'deduplicate', value: String(deduplicate) });
 	}
 	if (ensureUniqueFilename !== undefined) {
-		formData.append('ensureUniqueFilename', String(ensureUniqueFilename));
+		parts.push({ fieldName: 'ensureUniqueFilename', value: String(ensureUniqueFilename) });
 	}
 	if (fieldId) {
-		formData.append('fieldId', fieldId);
+		parts.push({ fieldName: 'fieldId', value: fieldId });
 	}
 	if (width !== undefined) {
-		formData.append('width', String(width));
+		parts.push({ fieldName: 'width', value: String(width) });
 	}
 	if (height !== undefined) {
-		formData.append('height', String(height));
+		parts.push({ fieldName: 'height', value: String(height) });
 	}
 
-	requestOptions.body = formData;
-	if (requestOptions.headers) {
-		delete requestOptions.headers['Content-Type'];
-		delete requestOptions.headers['content-type'];
-	}
+	const multipart = encodeMultipart(parts);
+	requestOptions.body = multipart.body;
+	setMultipartContentType(requestOptions, multipart.contentType);
 
 	return requestOptions;
 }
@@ -388,19 +397,16 @@ export async function prepareMediaReplacement(
 		dataBuffer = await this.helpers.getBinaryDataBuffer(itemIndex, binaryPropertyName);
 	}
 
-	const formData = new FormData();
 	const mimeType = binaryData?.mimeType || 'application/octet-stream';
 	const fileName = binaryData?.fileName || 'file';
-	const blob = new Blob([dataBuffer as unknown as Uint8Array<ArrayBuffer>], { type: mimeType });
-	formData.append('file', blob, fileName);
-	formData.append('width', String(width));
-	formData.append('height', String(height));
+	const multipart = encodeMultipart([
+		{ fieldName: 'file', data: dataBuffer, fileName, mimeType },
+		{ fieldName: 'width', value: String(width) },
+		{ fieldName: 'height', value: String(height) },
+	]);
 
-	requestOptions.body = formData;
-	if (requestOptions.headers) {
-		delete requestOptions.headers['Content-Type'];
-		delete requestOptions.headers['content-type'];
-	}
+	requestOptions.body = multipart.body;
+	setMultipartContentType(requestOptions, multipart.contentType);
 
 	return requestOptions;
 }
