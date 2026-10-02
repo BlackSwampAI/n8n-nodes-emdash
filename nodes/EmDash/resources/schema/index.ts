@@ -8,14 +8,11 @@ import {
 	validateUpdateField,
 	validateReorderFields,
 } from '../../shared/transport';
-import { schemaGetCollectionsDescription } from './getCollections';
 import { schemaGetCollectionDescription } from './getCollection';
 import { schemaCreateCollectionDescription } from './createCollection';
 import { schemaUpdateCollectionDescription } from './updateCollection';
 import { schemaDeleteCollectionDescription } from './deleteCollection';
 import { schemaReorderCollectionsDescription } from './reorderCollections';
-import { schemaGetFieldsDescription } from './getFields';
-import { schemaGetFieldDescription } from './getField';
 import { schemaCreateFieldDescription } from './createField';
 import { schemaUpdateFieldDescription } from './updateField';
 import { schemaDeleteFieldDescription } from './deleteField';
@@ -333,14 +330,11 @@ export const schemaDescription: INodeProperties[] = [
 	},
 	schemaCollectionSelect,
 	schemaFieldSelect,
-	...schemaGetCollectionsDescription,
 	...schemaGetCollectionDescription,
 	...schemaCreateCollectionDescription,
 	...schemaUpdateCollectionDescription,
 	...schemaDeleteCollectionDescription,
 	...schemaReorderCollectionsDescription,
-	...schemaGetFieldsDescription,
-	...schemaGetFieldDescription,
 	...schemaCreateFieldDescription,
 	...schemaUpdateFieldDescription,
 	...schemaDeleteFieldDescription,

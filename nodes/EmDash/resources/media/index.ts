@@ -12,13 +12,10 @@ import { mediaGetManyDescription } from './getAll';
 import { mediaGetDescription } from './get';
 import { mediaUploadDescription } from './upload';
 import { mediaUpdateDescription } from './update';
-import { mediaDeleteDescription } from './delete';
 import { mediaGetUsageDescription } from './getUsage';
 import { mediaGetAllFoldersDescription } from './getAllFolders';
-import { mediaGetFolderDescription } from './getFolder';
 import { mediaCreateFolderDescription } from './createFolder';
 import { mediaUpdateFolderDescription } from './updateFolder';
-import { mediaDeleteFolderDescription } from './deleteFolder';
 import { mediaReplaceImageDescription } from './replaceImage';
 import { mediaGetUploadTargetDescription } from './getUploadTarget';
 import { mediaUploadPendingDescription } from './uploadPending';
@@ -397,13 +394,10 @@ export const mediaDescription: INodeProperties[] = [
 	...mediaGetDescription,
 	...mediaUploadDescription,
 	...mediaUpdateDescription,
-	...mediaDeleteDescription,
 	...mediaGetUsageDescription,
 	...mediaGetAllFoldersDescription,
-	...mediaGetFolderDescription,
 	...mediaCreateFolderDescription,
 	...mediaUpdateFolderDescription,
-	...mediaDeleteFolderDescription,
 	...mediaReplaceImageDescription,
 	...mediaGetUploadTargetDescription,
 	...mediaUploadPendingDescription,

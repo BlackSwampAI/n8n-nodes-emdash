@@ -2,10 +2,8 @@ import type { INodeProperties } from 'n8n-workflow';
 import { sectionSelect } from '../../shared/descriptions';
 import { validateCreateSection, validateUpdateSection } from '../../shared/transport';
 import { sectionGetAllDescription } from './getAll';
-import { sectionGetDescription } from './get';
 import { sectionCreateDescription } from './create';
 import { sectionUpdateDescription } from './update';
-import { sectionDeleteDescription } from './delete';
 
 const showOnlyForSection = {
 	resource: ['section'],
@@ -143,8 +141,6 @@ export const sectionDescription: INodeProperties[] = [
 	},
 	sectionSelect,
 	...sectionGetAllDescription,
-	...sectionGetDescription,
 	...sectionCreateDescription,
 	...sectionUpdateDescription,
-	...sectionDeleteDescription,
 ];

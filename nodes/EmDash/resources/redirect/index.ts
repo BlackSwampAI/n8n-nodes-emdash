@@ -1,14 +1,11 @@
 import type { INodeProperties } from 'n8n-workflow';
 import { redirectIdProperty } from '../../shared/descriptions';
 import { redirectGetAllRedirectsDescription } from './getAllRedirects';
-import { redirectGetRedirectDescription } from './getRedirect';
 import { redirectCreateRedirectDescription } from './createRedirect';
 import { redirectUpdateRedirectDescription } from './updateRedirect';
-import { redirectDeleteRedirectDescription } from './deleteRedirect';
 import { redirectGet404EntriesDescription } from './get404Entries';
 import { redirectGet404SummaryDescription } from './get404Summary';
 import { redirectPrune404LogDescription } from './prune404Log';
-import { redirectClear404LogDescription } from './clear404Log';
 
 const showOnlyForRedirect = {
 	resource: ['redirect'],
@@ -227,12 +224,9 @@ export const redirectDescription: INodeProperties[] = [
 	},
 	redirectIdProperty,
 	...redirectGetAllRedirectsDescription,
-	...redirectGetRedirectDescription,
 	...redirectCreateRedirectDescription,
 	...redirectUpdateRedirectDescription,
-	...redirectDeleteRedirectDescription,
 	...redirectGet404EntriesDescription,
 	...redirectGet404SummaryDescription,
 	...redirectPrune404LogDescription,
-	...redirectClear404LogDescription,
 ];

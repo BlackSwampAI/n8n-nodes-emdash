@@ -6,13 +6,9 @@ import {
 	validateUpdateWidget,
 	validateReorderWidgets,
 } from '../../shared/transport';
-import { widgetAreaGetAllDescription } from './getAll';
-import { widgetAreaGetDescription } from './get';
 import { widgetAreaCreateDescription } from './create';
-import { widgetAreaDeleteDescription } from './delete';
 import { widgetAreaCreateWidgetDescription } from './createWidget';
 import { widgetAreaUpdateWidgetDescription } from './updateWidget';
-import { widgetAreaDeleteWidgetDescription } from './deleteWidget';
 import { widgetAreaReorderWidgetsDescription } from './reorderWidgets';
 
 const showOnlyForWidgetArea = {
@@ -224,12 +220,8 @@ export const widgetAreaDescription: INodeProperties[] = [
 	},
 	widgetAreaSelect,
 	widgetIdProperty,
-	...widgetAreaGetAllDescription,
-	...widgetAreaGetDescription,
 	...widgetAreaCreateDescription,
-	...widgetAreaDeleteDescription,
 	...widgetAreaCreateWidgetDescription,
 	...widgetAreaUpdateWidgetDescription,
-	...widgetAreaDeleteWidgetDescription,
 	...widgetAreaReorderWidgetsDescription,
 ];

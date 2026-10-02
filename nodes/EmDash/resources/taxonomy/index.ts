@@ -1,14 +1,9 @@
 import type { INodeProperties } from 'n8n-workflow';
 import { taxonomySelect, termSlugProperty } from '../../shared/descriptions';
-import { taxonomyGetAllTaxonomiesDescription } from './getAllTaxonomies';
-import { taxonomyGetTaxonomyDescription } from './getTaxonomy';
 import { taxonomyUpdateTaxonomyDescription } from './updateTaxonomy';
-import { taxonomyDeleteTaxonomyDescription } from './deleteTaxonomy';
 import { taxonomyGetAllTermsDescription } from './getAllTerms';
-import { taxonomyGetTermDescription } from './getTerm';
 import { taxonomyCreateTermDescription } from './createTerm';
 import { taxonomyUpdateTermDescription } from './updateTerm';
-import { taxonomyDeleteTermDescription } from './deleteTerm';
 import { taxonomyReorderTermsDescription } from './reorderTerms';
 
 const showOnlyForTaxonomy = {
@@ -250,14 +245,9 @@ export const taxonomyDescription: INodeProperties[] = [
 	},
 	taxonomySelect,
 	termSlugProperty,
-	...taxonomyGetAllTaxonomiesDescription,
-	...taxonomyGetTaxonomyDescription,
 	...taxonomyUpdateTaxonomyDescription,
-	...taxonomyDeleteTaxonomyDescription,
 	...taxonomyGetAllTermsDescription,
-	...taxonomyGetTermDescription,
 	...taxonomyCreateTermDescription,
 	...taxonomyUpdateTermDescription,
-	...taxonomyDeleteTermDescription,
 	...taxonomyReorderTermsDescription,
 ];
