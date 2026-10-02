@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.3
+
+### Changed
+
+- Retained only the filename-matching `Emdash` and `EmdashTrigger` constructor exports used by n8n's
+  directory loader, removing redundant constructor aliases without changing node identifiers or
+  package registration paths.
+- Replaced native runtime `FormData` and `Blob` construction in upload hooks with a dependency-free
+  multipart `Buffer` and explicit boundary. This is a compatibility cleanup: the original 0.1.2
+  upload and replacement paths also worked in the tested n8n runtime fixture.
+- Removed 32 empty operation property modules and their no-op index spreads. The declarative
+  operations, editor controls, routing, hooks, shared parameters, and API behavior remain assembled
+  in the resource indexes and shared descriptions.
+- Restored CI workflow registration support with a safe manual CI dispatch and documented the
+  one-time npm bootstrap sequence needed after repository and package restoration. Publication
+  remains tag-only with reviewed-main and immutable annotated-tag guards.
+
 ## 0.1.2
 
 ### Changed

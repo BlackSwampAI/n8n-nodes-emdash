@@ -1,6 +1,6 @@
 # Testing strategy for EmDash integration
 
-## Paired action/trigger picker convention — unreleased
+## Paired action/trigger picker convention
 
 n8n 2.30.6 bundles `n8n-editor-ui` 2.30.4. Its action generator removes `Trigger` from a trigger's
 internal name, groups a matching action and trigger under one service entry, combines their choices,
@@ -179,7 +179,8 @@ triggers only.
 
 For this compatibility batch, the orchestrator also ran packed-package upload and replacement
 workflows in n8n 2.30.6 against a local multipart HTTP parser fixture. The original 0.1.2 package and
-the new candidate both preserved exact binary bytes, UTF-8 filename and MIME metadata, thumbnail,
+the 0.1.2-versioned packed review candidate containing the new implementation both preserved exact
+binary bytes, UTF-8 filename and MIME metadata, thumbnail,
 authentication, boolean and optional text fields, replacement path/method/dimensions, and normalized
 workflow output. This fixture evidence verifies the n8n request path and serializer compatibility;
 it is not a real EmDash-host test or human review approval.
@@ -224,3 +225,25 @@ it is not a real EmDash-host test or human review approval.
 - Run `npm run scan:published` only in a fresh, read-only `verify-published` job that depends on `publish` and performs its own checkout, Node setup, and `npm ci`.
 - If only the verifier fails after npm publication, inspect npm first and rerun only failed jobs. Never rerun a successful publish job for an existing version.
 - Treat only the exact documented metadata, analysis-404, and provenance source-repository 404 propagation messages as retryable. A generic HTTP status match is too broad.
+
+## 0.1.3 release-candidate evidence
+
+Local validation for the 0.1.3 source candidate used Node 24.18.0 and pinned npm 11.19.0 on the
+existing dependency tree. Formatting, lint, strict typecheck, build, official source and
+built-package scanner preflights, release audit, package boundary validation, and compiled
+registration loading passed. The dry-run package contains 301 files, 98,091 packed bytes, and
+692,201 unpacked bytes. The sandbox run passed 338 tests while seven release-tag tests could not
+spawn their disposable Git repositories (`spawnSync git EPERM`). The primary then completed a fresh
+pinned npm 11.19.0 install of 744 packages without changing the lockfile, and all 345 tests across 12
+files passed outside the sandbox.
+
+The isolated packed 0.1.3 installation also passed and loaded two nodes with two wired credential
+types. A representative real-n8n runtime smoke remains pending. Hosted CI on the exact merged `main`
+commit, browser presentation, a live EmDash host, publication, post-publication verification, GitHub
+release creation, and Creator Portal checks also remain pending. The user deferred tagging and
+publication until 2026-10-03. Before then, recheck the package-name waiting period, release
+authentication, exact release-commit CI, and the candidate runtime evidence.
+
+The dependency tree used for development retains 24 audit findings (17 high and 7 moderate). These
+are development and host-provided package-tree findings; the published package declares no bundled
+runtime dependencies.
