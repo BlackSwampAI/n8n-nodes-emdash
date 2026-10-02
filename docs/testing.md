@@ -168,6 +168,22 @@ publication, published-package verification, GitHub release, or Creator Portal v
 
 ## Unit and contract tests
 
+Direct upload and image replacement keep declarative routing and their existing `preSend` hooks. The
+hooks now hand n8n an `IHttpRequestOptions` body as a `Buffer` with an explicit multipart boundary,
+without a runtime multipart dependency or native `FormData`/`Blob`. Tests decode the emitted bytes
+with the test runtime's independent `Request.formData()` parser and verify exact binary content,
+text fields, required replacement dimensions, optional thumbnails, non-ASCII filenames, quote and
+CR/LF header safety, MIME fallback, and boundary-collision handling. This verifies serialization;
+it does not claim an upload against a live EmDash service. Existing real-n8n smokes covered reads and
+triggers only.
+
+For this compatibility batch, the orchestrator also ran packed-package upload and replacement
+workflows in n8n 2.30.6 against a local multipart HTTP parser fixture. The original 0.1.2 package and
+the new candidate both preserved exact binary bytes, UTF-8 filename and MIME metadata, thumbnail,
+authentication, boolean and optional text fields, replacement path/method/dimensions, and normalized
+workflow output. This fixture evidence verifies the n8n request path and serializer compatibility;
+it is not a real EmDash-host test or human review approval.
+
 - Use strict TypeScript `*.test.ts` files under Vitest.
 - Assert resource/operation visibility and every required control's display conditions.
 - Test manual strings, expression values, and list-mode resource-locator objects.

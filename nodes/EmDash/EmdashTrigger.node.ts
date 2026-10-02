@@ -226,5 +226,3 @@ export class EmdashTrigger implements INodeType {
 		};
 	}
 }
-
-export { EmdashTrigger as EmDashTrigger };

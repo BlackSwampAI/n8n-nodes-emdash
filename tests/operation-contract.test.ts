@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EmDash } from '../nodes/EmDash/Emdash.node';
+import { Emdash } from '../nodes/EmDash/Emdash.node';
 import {
 	assertRequiredControls,
 	normalizeResourceLocator,
@@ -8,7 +8,7 @@ import {
 
 describe('EmDash node operation contracts', () => {
 	it('checks required controls against actual display conditions', () => {
-		const description = new EmDash().description;
+		const description = new Emdash().description;
 
 		// Content Create: requires collection and data
 		expect(() =>

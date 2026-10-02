@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { NodeConnectionTypes, type IDataObject, type IWebhookFunctions } from 'n8n-workflow';
 import { describe, expect, it, vi } from 'vitest';
 import { EmDashWebhook } from '../credentials/EmDashWebhook.credentials';
-import { EmdashTrigger, EmDashTrigger } from '../nodes/EmDash/EmdashTrigger.node';
+import { EmdashTrigger } from '../nodes/EmDash/EmdashTrigger.node';
 
 const readJson = async (path: string) =>
 	JSON.parse(await readFile(new URL(`../${path}`, import.meta.url), 'utf8'));
@@ -83,9 +83,8 @@ const validMediaPayload = {
 };
 
 describe('EmDash Trigger packaging & loader requirements', () => {
-	it('exports EmdashTrigger and EmDashTrigger alias', () => {
+	it('exports the filename-matching constructor with the stable node identifier', () => {
 		expect(EmdashTrigger).toBeDefined();
-		expect(EmDashTrigger).toBe(EmdashTrigger);
 		const instance = new EmdashTrigger();
 		expect(instance.description.name).toBe('emdashTrigger');
 		expect(instance.description.displayName).toBe('EmDash Trigger');

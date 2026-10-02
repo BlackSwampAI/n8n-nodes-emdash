@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Emdash, EmDash } from '../nodes/EmDash/Emdash.node';
+import { Emdash } from '../nodes/EmDash/Emdash.node';
 import { EmDashApi } from '../credentials/EmDashApi.credentials';
 import { normalizeBaseUrl } from '../nodes/EmDash/shared/utils';
 import {
@@ -49,7 +49,7 @@ import { getWidgetAreas } from '../nodes/EmDash/listSearch/getWidgetAreas';
 import type { INodeProperties, INodePropertyOptions } from 'n8n-workflow';
 
 describe('EmDash integration tests', () => {
-	const node = new EmDash();
+	const node = new Emdash();
 	const credentials = new EmDashApi();
 
 	describe('baseURL normalization', () => {
@@ -682,7 +682,7 @@ describe('EmDash integration tests', () => {
 	});
 
 	describe('media upload preSend hook implementation', () => {
-		it('builds multipart FormData and deletes Content-Type header', async () => {
+		it('builds a multipart Buffer with an explicit boundary', async () => {
 			const fileBuffer = Buffer.from('test-binary-data');
 			const mockContext = {
 				getNodeParameter: (name: string, fallback?: unknown) => {
@@ -716,16 +716,23 @@ describe('EmDash integration tests', () => {
 				url: 'https://example.com/_emdash/api/media',
 				headers: {
 					Accept: 'application/json',
-					'Content-Type': 'application/json',
+					'CoNtEnT-TyPe': 'application/json',
 				},
 			};
 
 			const result = await prepareMediaUpload.call(mockContext as never, requestOptions);
-			expect(result.headers?.['Content-Type']).toBeUndefined();
+			expect(result.headers?.['Content-Type']).toMatch(
+				/^multipart\/form-data; boundary=----n8nEmDashBoundary[a-z0-9]+$/,
+			);
 			expect(result.headers?.['content-type']).toBeUndefined();
-			expect(result.body).toBeInstanceOf(FormData);
+			expect(result.headers?.['CoNtEnT-TyPe']).toBeUndefined();
+			expect(Buffer.isBuffer(result.body)).toBe(true);
 
-			const formData = result.body as FormData;
+			const formData = await new Request('https://example.com', {
+				method: 'POST',
+				headers: { 'Content-Type': result.headers?.['Content-Type'] as string },
+				body: new Uint8Array(result.body as Buffer),
+			}).formData();
 			expect(formData.get('folderId')).toBe('fld_test');
 			expect(formData.get('deduplicate')).toBe('true');
 			expect(formData.get('ensureUniqueFilename')).toBe('true');
@@ -733,6 +740,7 @@ describe('EmDash integration tests', () => {
 			const blob = formData.get('file') as Blob;
 			expect(blob).toBeDefined();
 			expect(blob.type).toBe('image/jpeg');
+			expect(Buffer.from(await blob.arrayBuffer())).toEqual(fileBuffer);
 		});
 	});
 
@@ -764,7 +772,11 @@ describe('EmDash integration tests', () => {
 			};
 
 			const result = await prepareMediaUpload.call(mockContext as never, requestOptions);
-			const formData = result.body as FormData;
+			const formData = await new Request('https://example.com', {
+				method: 'POST',
+				headers: { 'Content-Type': result.headers?.['Content-Type'] as string },
+				body: new Uint8Array(result.body as Buffer),
+			}).formData();
 			expect(formData.get('fieldId')).toBe('avatar');
 			expect(formData.get('width')).toBe('800');
 			expect(formData.get('height')).toBe('600');
@@ -802,10 +814,15 @@ describe('EmDash integration tests', () => {
 			};
 
 			const result = await prepareMediaUpload.call(mockContext as never, requestOptions);
-			const formData = result.body as FormData;
+			const formData = await new Request('https://example.com', {
+				method: 'POST',
+				headers: { 'Content-Type': result.headers?.['Content-Type'] as string },
+				body: new Uint8Array(result.body as Buffer),
+			}).formData();
 			const thumbBlob = formData.get('thumbnail') as Blob;
 			expect(thumbBlob).toBeDefined();
 			expect(thumbBlob.type).toBe('image/jpeg');
+			expect(Buffer.from(await thumbBlob.arrayBuffer())).toEqual(thumbBuffer);
 		});
 
 		it('validates width and height when supplied to direct upload', async () => {
@@ -846,7 +863,7 @@ describe('EmDash integration tests', () => {
 	});
 
 	describe('media replacement preSend hook implementation', () => {
-		it('builds multipart FormData with file, width, and height, deleting Content-Type header', async () => {
+		it('builds a multipart Buffer with file, width, and height', async () => {
 			const fileBuffer = Buffer.from('replacement-binary-data');
 			const mockContext = {
 				getNodeParameter: (name: string, fallback?: unknown) => {
@@ -877,17 +894,24 @@ describe('EmDash integration tests', () => {
 			};
 
 			const result = await prepareMediaReplacement.call(mockContext as never, requestOptions);
-			expect(result.headers?.['Content-Type']).toBeUndefined();
+			expect(result.headers?.['Content-Type']).toMatch(
+				/^multipart\/form-data; boundary=----n8nEmDashBoundary[a-z0-9]+$/,
+			);
 			expect(result.headers?.['content-type']).toBeUndefined();
-			expect(result.body).toBeInstanceOf(FormData);
+			expect(Buffer.isBuffer(result.body)).toBe(true);
 
-			const formData = result.body as FormData;
+			const formData = await new Request('https://example.com', {
+				method: 'POST',
+				headers: { 'Content-Type': result.headers?.['Content-Type'] as string },
+				body: new Uint8Array(result.body as Buffer),
+			}).formData();
 			expect(formData.get('width')).toBe('1920');
 			expect(formData.get('height')).toBe('1080');
 
 			const blob = formData.get('file') as Blob;
 			expect(blob).toBeDefined();
 			expect(blob.type).toBe('image/webp');
+			expect(Buffer.from(await blob.arrayBuffer())).toEqual(fileBuffer);
 		});
 
 		it('validates width and height are integers > 0', async () => {
@@ -4778,11 +4802,9 @@ describe('EmDash integration tests', () => {
 		});
 	});
 
-	describe('node class exports', () => {
-		it('exports both Emdash and EmDash constructors identically', () => {
+	describe('node class export', () => {
+		it('uses the filename-matching constructor and stable node identifier', () => {
 			expect(Emdash).toBeDefined();
-			expect(EmDash).toBeDefined();
-			expect(Emdash).toBe(EmDash);
 			const instance = new Emdash();
 			expect(instance.description.name).toBe('emdash');
 		});
