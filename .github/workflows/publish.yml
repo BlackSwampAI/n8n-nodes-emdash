@@ -1,4 +1,6 @@
 name: Publish
+# Repository-restoration recovery keeps publication tag-only. Do not replay an existing release tag.
+# A future release requires a new reviewed version and explicit user authorization.
 on:
   push:
     tags:

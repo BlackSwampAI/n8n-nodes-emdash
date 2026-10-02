@@ -9,18 +9,12 @@ import { contentPublishDescription } from './publish';
 import { contentUnpublishDescription } from './unpublish';
 import { contentScheduleDescription } from './schedule';
 import { contentUnscheduleDescription } from './unschedule';
-import { contentDuplicateDescription } from './duplicate';
-import { contentRestoreDescription } from './restore';
-import { contentPermanentDeleteDescription } from './permanentDelete';
-import { contentCompareDescription } from './compare';
 import { contentDiscardDraftDescription } from './discardDraft';
 import { contentGetTermsDescription } from './getContentTerms';
 import { contentSetTermsDescription } from './setContentTerms';
 import { contentAcquireLockDescription } from './acquireLock';
-import { contentGetAuthorsDescription } from './getAuthors';
 import { contentGetLockDescription } from './getLock';
 import { contentGetTrashedDescription } from './getTrashed';
-import { contentGetTranslationsDescription } from './getTranslations';
 import { contentReleaseLockDescription } from './releaseLock';
 
 const showOnlyForContent = {
@@ -554,17 +548,11 @@ export const contentDescription: INodeProperties[] = [
 	...contentUnpublishDescription,
 	...contentScheduleDescription,
 	...contentUnscheduleDescription,
-	...contentDuplicateDescription,
-	...contentRestoreDescription,
-	...contentPermanentDeleteDescription,
-	...contentCompareDescription,
 	...contentDiscardDraftDescription,
 	...contentGetTermsDescription,
 	...contentSetTermsDescription,
 	...contentAcquireLockDescription,
-	...contentGetAuthorsDescription,
 	...contentGetLockDescription,
 	...contentGetTrashedDescription,
-	...contentGetTranslationsDescription,
 	...contentReleaseLockDescription,
 ];

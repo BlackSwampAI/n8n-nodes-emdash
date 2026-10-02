@@ -2,8 +2,6 @@ import type { INodeProperties } from 'n8n-workflow';
 import { searchCollectionSelect } from '../../shared/descriptions';
 import { searchSearchDescription } from './search';
 import { searchSuggestDescription } from './suggest';
-import { searchGetStatsDescription } from './getStats';
-import { searchRebuildIndexDescription } from './rebuildIndex';
 import { searchEnableSearchDescription } from './enableSearch';
 
 const showOnlyForSearch = {
@@ -136,7 +134,5 @@ export const searchDescription: INodeProperties[] = [
 	searchCollectionSelect,
 	...searchSearchDescription,
 	...searchSuggestDescription,
-	...searchGetStatsDescription,
-	...searchRebuildIndexDescription,
 	...searchEnableSearchDescription,
 ];

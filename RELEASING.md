@@ -6,7 +6,44 @@ Releases are user-authorized and publish only from `.github/workflows/publish.ym
 
 Complete the README initialization checklist. `npm run release:check` enters template mode only when the normalized git origin is exactly this template repository. Every generated repository uses normal mode and must have final identity, no placeholders/examples, and no `private: true`.
 
-## 0.1.2 release handoff
+## Repository restoration recovery
+
+The GitHub repository was deleted and restored with source and immutable tags preserved, but its
+Actions run history and repository secrets were lost. The npm package was separately removed, so
+the previously published `0.1.0`, `0.1.1`, and `0.1.2` versions are currently unusable from the
+registry even though their source tags remain. Do not replay any existing tag or attempt to republish
+an existing version.
+
+Recover CI first: merge the reviewed workflow recovery change, confirm GitHub registers both workflow
+paths, manually dispatch CI, and require both Node 22.22.0 and Node 24 lanes to pass their frozen
+npm 11.19.0 install and all package gates. Source YAML and local validation alone do not prove GitHub
+registered or ran the workflows. Lost Actions runs and npm registry objects are external state; their
+loss does not imply that the restored source, tags, or release guards are missing.
+
+The recovery itself did not authorize a release. The user subsequently authorized preparation of
+version `0.1.3` and deferred tagging and publication until 2026-10-03. Before tagging, verify npm's
+current package-name availability, unpublish/republication waiting periods, and bootstrap rules
+against npm's live service and
+[official unpublish policy](https://docs.npmjs.com/policies/unpublish/). The current policy blocks new
+versions under the fully removed package name for 24 hours and permanently forbids reusing a
+published name/version pair. At about 10:24 UTC on 2026-10-02, the user reported that the package had
+been unpublished roughly eight hours earlier; the exact unpublish time is unknown. Verify the live
+registry state rather than deriving an eligibility time from that estimate.
+Never reuse `0.1.0`, `0.1.1`, or `0.1.2`.
+
+The `NPM_TOKEN` GitHub Actions secret was observed present on 2026-10-02 for the one-time bootstrap.
+Secret presence does not prove that the credential is valid, correctly scoped, or accepted by npm.
+Never expose or read the token through source, commands, issues, or logs.
+
+After that first publication succeeds and the separate verifier passes, configure npm Trusted
+Publishing for owner `BlackSwampAI`, repository `n8n-nodes-emdash`, workflow `publish.yml`, and no
+GitHub Environment, explicitly selecting **Allow npm publish** rather than stage-only permission.
+Then remove the temporary `NPM_TOKEN` repository secret and revoke the token. `DISCORD_WEBHOOK` is
+optional and may be entered by the user; never send a live test notification. Do not claim publish
+readiness until repository settings, npm package state, authentication, the one-time publish job,
+and the independent verifier have all been observed directly.
+
+## Historical 0.1.2 release handoff
 
 The package and changelog versions are `0.1.2`. This patch gives the grouped EmDash action and
 trigger picker an accurate shared description and adopts the reviewed template 2.2.0 development
@@ -15,27 +52,50 @@ registrations, credentials, 103 action operations, five trigger event choices, w
 implementation styles, dependencies, and runtime API behavior.
 
 The user manually accepted the grouped picker wording on n8n 2.30.6 / `n8n-editor-ui` 2.30.4 with
-package 0.1.1 and Node 24.18.0. The 0.1.2 candidate retains the same node runtime implementation and
-changes release/development tooling plus metadata wording. This acceptance does not cover icons,
+package 0.1.1 and Node 24.18.0. The released 0.1.2 artifact retained the same node runtime
+implementation and changed release/development tooling plus metadata wording. This acceptance does not cover icons,
 dynamic dropdowns, an actual EmDash server, or end-to-end Webhook Notifier delivery.
 
-Before tagging, review this candidate, merge it to `main`, and require the exact resulting `main`
-commit to pass CI on Node 22.22.0 and Node 24. Create the annotated `v0.1.2` tag only on that reviewed
-commit after explicit user authorization. The release-tag guard rejects a tag on an off-main candidate
-branch. Pushing, tagging, publishing, and creating a release require explicit user authorization.
+Before the historical tag was created, the change was reviewed, merged to `main`, and the exact
+resulting `main` commit passed CI on Node 22.22.0 and Node 24. The annotated `v0.1.2` tag was created
+only on that reviewed commit after explicit user authorization. The release-tag guard continues to
+reject a tag on an off-main branch. Pushing, tagging, publishing, and creating a release require
+explicit user authorization.
 
-This existing package publishes through npm Trusted Publishing. The GitHub publish job must retain
-`id-token: write`, and the npm Trusted Publisher must match the exact GitHub owner, repository,
-`publish.yml` workflow, and declared environment (none). The repository must not contain or require an
-`NPM_TOKEN` secret for this release. The authentication helper still preserves narrowly scoped token
-bootstrap support for repositories that genuinely require a first publication.
+The original 0.1.2 publication used npm Trusted Publishing. That trust relationship cannot be assumed
+after the package was removed. The workflow still retains `id-token: write` only on the publish
+job and preserves narrowly scoped token bootstrap support for a genuinely new registry package.
 
-The user has authorized the 0.1.2 release through completion. The primary orchestrator owns the
-reviewed-main merge/tag gate, publication, and post-publication verification. Public-droplet Webhook
-Notifier delivery, icon presentation, and dynamic dropdown browser checks remain unverified. The
-inherited online dependency audit also remains open with 17 high and 7 moderate findings; passing
-package gates does not waive those findings. Resolve material dependency changes only through a
-separate reviewed and authorized dependency update.
+The historical authorization for 0.1.2 was completed and does not authorize another publication.
+Public-droplet Webhook Notifier delivery, icon presentation, and dynamic dropdown browser checks
+remain unverified. The inherited online dependency audit also remains open with 17 high and 7
+moderate findings; passing package gates does not waive those findings. Resolve material dependency
+changes only through a separate reviewed and authorized dependency update.
+
+## Authorized 0.1.3 release handoff
+
+The user authorized preparation of the new `0.1.3` release and asked to return on 2026-10-03 for the
+publication step. Before any tag or publication, require final human pull-request review and merge,
+successful hosted CI on the exact resulting `main` commit, a representative real-n8n candidate
+smoke, expiration of npm's whole-package unpublish waiting period, and direct verification of the
+new version's availability and release authentication. Do not publish from the pull-request branch,
+replay an old tag, or create the annotated `v0.1.3` tag before the reviewed commit is in
+`origin/main`.
+
+The 0.1.3 candidate removes redundant constructor aliases, replaces native runtime multipart objects
+with an explicitly encoded `Buffer`, removes 32 empty property-only operation modules, and restores
+CI recovery documentation and safe manual CI dispatch. These changes retain the existing node
+identifiers, registrations, UI operations, routes, hooks, and API behavior. The multipart change is
+a compatibility cleanup; both the original published 0.1.2 package and the 0.1.2-versioned packed
+review candidate containing the new implementation passed the local n8n multipart fixture. A fresh
+0.1.3 runtime smoke remains required on 2026-10-03.
+
+After the npm waiting period, recheck that the package is absent and that the new version is eligible,
+then allow only the tag-triggered workflow to perform the bootstrap publication. After publication
+and the independent verifier succeed, configure npm Trusted Publishing for owner `BlackSwampAI`,
+repository `n8n-nodes-emdash`, workflow `publish.yml`, and no environment, selecting **Allow npm
+publish**. Then delete the temporary `NPM_TOKEN` Actions secret and revoke its npm token. Trusted
+Publisher configuration is available only after the package exists again.
 
 ## Prepublication gate
 
@@ -66,11 +126,20 @@ Inspect the dry-run tarball and install it in a disposable n8n instance. Verify 
 
 Every API credential should provide a harmless authenticated test request where the service supports one. Add a product-specific release invariant so the credential cannot remain registered but disconnected from every node.
 
-## Trusted Publishing and first-publication fallback
+## Trusted Publishing and restored-package bootstrap
 
-npm requires a package to exist before Trusted Publisher configuration. Existing packages such as this one use OIDC with no `NPM_TOKEN`. For a genuinely new package only, create a narrowly scoped, temporary granular token with publish access only to that package and store it only as the `NPM_TOKEN` Actions secret. After explicit user approval, tag the reviewed commit with an annotated immutable version tag and let GitHub Actions publish with provenance. The tagged commit must already be contained in `origin/main`; a tag on an unmerged release branch is rejected.
+npm requires a package to exist before Trusted Publisher configuration. Because this package is
+currently absent from the registry, treat the next authorized new-version publication as a manual
+bootstrap only after verifying npm's current package availability and waiting-period rules. Create a
+narrowly scoped, temporary granular token with publish access only to the exact package and store it
+only as the `NPM_TOKEN` Actions secret. After explicit user approval, tag the reviewed commit with an
+annotated immutable new version tag and let GitHub Actions publish with provenance. The tagged commit
+must already be contained in `origin/main`; a tag on an unmerged release branch is rejected.
 
-Immediately after success, configure npm Trusted Publishing for the exact GitHub owner, repository, `publish.yml`, and no environment unless the workflow declares one. Delete the GitHub secret and revoke the token. Existing packages skip token bootstrap and use OIDC from the first release.
+Immediately after success, configure npm Trusted Publishing for `BlackSwampAI`,
+`n8n-nodes-emdash`, `publish.yml`, and no environment, explicitly selecting **Allow npm publish**.
+Delete the GitHub `NPM_TOKEN` secret and revoke the temporary token. Later releases use OIDC and must
+not restore the token.
 
 The workflow removes setup-node's literal empty `_authToken=${NODE_AUTH_TOKEN}` line before tokenless publishing. Do not remove this preparation: an empty auth placeholder can suppress OIDC.
 

@@ -1,6 +1,5 @@
 import type { INodeProperties } from 'n8n-workflow';
 import { validateUpdateSettings } from '../../shared/transport';
-import { settingsGetDescription } from './get';
 import { settingsUpdateDescription } from './update';
 
 const showOnlyForSettings = {
@@ -72,6 +71,5 @@ export const settingsDescription: INodeProperties[] = [
 		],
 		default: 'get',
 	},
-	...settingsGetDescription,
 	...settingsUpdateDescription,
 ];
