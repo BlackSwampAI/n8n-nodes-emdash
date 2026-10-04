@@ -6,7 +6,7 @@ Releases are user-authorized and publish only from `.github/workflows/publish.ym
 
 Complete the README initialization checklist. `npm run release:check` enters template mode only when the normalized git origin is exactly this template repository. Every generated repository uses normal mode and must have final identity, no placeholders/examples, and no `private: true`.
 
-## Repository restoration recovery
+## Historical: repository restoration recovery
 
 The GitHub repository was deleted and restored with source and immutable tags preserved, but its
 Actions run history and repository secrets were lost. The npm package was separately removed, so
@@ -43,7 +43,7 @@ optional and may be entered by the user; never send a live test notification. Do
 readiness until repository settings, npm package state, authentication, the one-time publish job,
 and the independent verifier have all been observed directly.
 
-## Historical 0.1.2 release handoff
+## Historical: 0.1.2 release handoff
 
 The package and changelog versions are `0.1.2`. This patch gives the grouped EmDash action and
 trigger picker an accurate shared description and adopts the reviewed template 2.2.0 development
@@ -72,7 +72,7 @@ remain unverified. The inherited online dependency audit also remains open with 
 moderate findings; passing package gates does not waive those findings. Resolve material dependency
 changes only through a separate reviewed and authorized dependency update.
 
-## Authorized 0.1.3 release handoff
+## Historical: authorized 0.1.3 release handoff
 
 The user authorized preparation of the new `0.1.3` release and asked to return on 2026-10-03 for the
 publication step. Before any tag or publication, require final human pull-request review and merge,
@@ -126,7 +126,7 @@ Inspect the dry-run tarball and install it in a disposable n8n instance. Verify 
 
 Every API credential should provide a harmless authenticated test request where the service supports one. Add a product-specific release invariant so the credential cannot remain registered but disconnected from every node.
 
-## Trusted Publishing and restored-package bootstrap
+## Historical: trusted publishing and restored-package bootstrap
 
 npm requires a package to exist before Trusted Publisher configuration. Because this package is
 currently absent from the registry, treat the next authorized new-version publication as a manual
@@ -157,3 +157,9 @@ Verify the workflow, npm version and `latest` tag, SLSA provenance attestation, 
 Submit only that exact published version to Creator Portal, then visually inspect and record its card version and logo. A valid npm tarball can still appear stale or generic in the portal.
 
 Before adopting this baseline in an older repository, inspect `.npmrc` and `engines.node`. Do not keep `engine-strict=true` when the declared engine excludes a required Node 22.22.0 or Node 24 CI lane. Create the migration branch from the current post-squash `main`; rebasing an old pre-squash feature branch can replay already-merged work.
+
+## 0.1.4 candidate handoff
+
+Version 0.1.4 removes the EmDash webhook trigger and dedicated webhook credential because the upstream notifier plugin is broken and delivery cannot be tested. The package retains one action node, one wired EmDash API credential, all 103 REST actions, and the existing dependency/release infrastructure. After upgrading, workflows containing `emdashTrigger` have a missing node and must be migrated before they can run. Replace it with Schedule Trigger + EmDash actions or another independently supported event source.
+
+The user authorized the 0.1.4 release through npm. npm 0.1.3 is published/latest and the temporary NPM_TOKEN secret is absent (observed 2026-10-03); trusted publisher settings have not been directly reverified here. The bounded package gates, fresh packed-content inspection, and representative n8n 2.30.6 runtime smoke are recorded in `docs/batch-handoff-0.1.4.md`. Hosted CI and final release review remain outstanding. The observed registry state was npm 0.1.3 published/latest and no `NPM_TOKEN` secret; trusted-publisher settings could not be directly verified here, and the npm authentication mode remains for the release workflow to confirm.

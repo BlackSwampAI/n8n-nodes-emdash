@@ -1,6 +1,6 @@
 {
 	"name": "@blackswampai/n8n-nodes-emdash",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"packageManager": "npm@11.19.0",
 	"description": "n8n community node integration for EmDash CMS",
 	"license": "MIT",
@@ -48,12 +48,10 @@
 		"n8nNodesApiVersion": 1,
 		"strict": true,
 		"credentials": [
-			"dist/credentials/EmDashApi.credentials.js",
-			"dist/credentials/EmDashWebhook.credentials.js"
+			"dist/credentials/EmDashApi.credentials.js"
 		],
 		"nodes": [
-			"dist/nodes/EmDash/Emdash.node.js",
-			"dist/nodes/EmDash/EmdashTrigger.node.js"
+			"dist/nodes/EmDash/Emdash.node.js"
 		]
 	},
 	"devDependencies": {

@@ -112,118 +112,15 @@ For each ordinary REST operation, begin with declarative routing and record whic
 
 Also verify path encoding, identifiers and response wrappers, list pagination, empty behavior, errors, update preservation, and edition boundaries. Prefer current documented routes; record pinned-version compatibility differences explicitly. Do not advertise an operation solely because it exists in OpenAPI.
 
-## Trigger / Event Contract
+## Trigger removal and migration
 
-The EmDash integration includes an event-driven trigger node (`emdashTrigger`) that responds to webhooks dispatched by the official EmDash webhook notifier plugin.
+Version 0.1.4 exposes only the EmDash action node and its EmDash API credential. The EmDash webhook trigger and its dedicated webhook credential were removed because the upstream webhook notifier plugin is broken and delivery cannot be tested. After upgrading, workflows containing `emdashTrigger` have a missing node and must be migrated before they can run. Replace it with **Schedule Trigger + EmDash actions** or another independently supported event source.
 
-### Upstream Notifier Package
+## Integration and implementation style
 
-- **Package**: `@emdash-cms/plugin-webhook-notifier`
-- **Supported Version**: 0.2.2 or higher
-- **Runtime Environment**: Cloudflare Workers / EmDash CMS v1
-
-### Supported Events
-
-The webhook notifier emits 4 official event types:
-
-1. `content:create`: Dispatched when an entry is created as a draft.
-2. `content:update`: Dispatched when an existing content entry is updated or revised.
-3. `content:delete`: Dispatched when an entry is moved to Trash or permanently deleted; the current notifier does not distinguish between the two.
-4. `media:upload`: Dispatched when a media asset is uploaded to the media library.
-
-### Payload Shape and Envelope Fields
-
-Webhooks deliver a JSON object envelope containing the following fields:
-
-- `event` (string, required): One of `content:create`, `content:update`, `content:delete`, `media:upload`.
-- `timestamp` (string, required): ISO 8601 UTC timestamp of event dispatch.
-- `resourceId` (string, required): Unique identifier of the created, mutated, or deleted resource.
-- `resourceType` (string, required): Resource category (`content` for content events, `media` for media events).
-- `collection` (string, required for content events): Target collection slug (e.g. `posts`, `pages`).
-- `data` (object, optional): Resource data payload. Inclusion is controlled by the EmDash notifier plugin setting `Include Content Data`. When enabled for content events, `data` contains the collection's custom content fields (`event.content.data`); system fields like `slug`, `status`, and `draftRevisionId` reside in `metadata`. When enabled for media upload events, `data` contains media metadata (`filename`, `mimeType`, `size`). When disabled, this field is omitted.
-- `metadata` (object, optional): System metadata about the event. For content events, contains `{ slug, status, draftRevisionId }`.
-
-Example content payload:
-
-```json
-{
-	"event": "content:create",
-	"timestamp": "2026-09-28T20:00:00.000Z",
-	"resourceId": "post_clx00123abc",
-	"resourceType": "content",
-	"collection": "posts",
-	"data": {
-		"title": "Announcing Product Launch",
-		"summary": "We are excited to share our latest release."
-	},
-	"metadata": {
-		"slug": "announcing-product-launch",
-		"status": "draft",
-		"draftRevisionId": "rev_01jk45mno"
-	}
-}
-```
-
-Example media payload:
-
-```json
-{
-	"event": "media:upload",
-	"timestamp": "2026-09-28T20:01:00.000Z",
-	"resourceId": "med_clx00456def",
-	"resourceType": "media",
-	"data": {
-		"filename": "hero-banner.jpg",
-		"mimeType": "image/jpeg",
-		"size": 245120
-	}
-}
-```
-
-### Request Headers
-
-Incoming webhook HTTP requests contain:
-
-- `Content-Type: application/json`
-- `X-EmDash-Event: <event>`: Header mirroring the payload event name (e.g. `content:create`).
-- `Authorization: Bearer <secretToken>`: Bearer authorization header with the shared secret token configured in EmDash settings.
-
-### Authentication Model
-
-The webhook endpoint verifies the caller using a shared secret token:
-
-- Expected secret token is configured in an **EmDash Webhook** (`emdashWebhook`) credential.
-- Incoming requests must supply `Authorization: Bearer <secretToken>`.
-- Token comparison is timing-safe using fixed-length SHA-256 cryptographic digests and `crypto.timingSafeEqual` to eliminate timing side-channel attacks.
-- Missing headers, incorrect schemes, empty tokens, or invalid secrets are rejected with HTTP 401 Unauthorized (`{ "error": "..." }`).
-- The secret token and authorization header are strictly redacted from workflow execution items and error responses.
-
-### Registration and Dispatch Model
-
-- **Manual registration**: EmDash CMS does not provide a public REST API for dynamically creating or managing webhook subscriptions. Webhook destinations are manually configured by site administrators in the EmDash dashboard.
-- **Single-webhook limitation**: The official notifier stores one destination webhook URL per site. Multiple workflows reacting to CMS events should branch downstream in n8n from a single trigger workflow.
-- **Picker grouping**: n8n groups visible `emdash` and `emdashTrigger` choices under one EmDash
-  service entry by removing `Trigger` from the trigger identifier, matching the convention used by
-  the built-in Airtable action/trigger pair. Action selections still instantiate `emdash`; event
-  selections instantiate `emdashTrigger`. Their node-specific default names remain **EmDash** and
-  **EmDash Trigger**. Current n8n uses the trigger description for the grouped service description,
-  so both nodes use the broad shared wording **Work with EmDash content, media, and events**.
-
-### Implementation Style and AGENTS.md Exception
-
-- **Action style**: All 103 ordinary REST operations remain declarative through routing,
-  expressions, pagination, `preSend`, and `postReceive` hooks.
-- **Trigger style**: Programmatic trigger (`webhook(this: IWebhookFunctions)`). Airtable's polling
-  implementation is not copied; EmDash requires the existing incoming webhook lifecycle, bearer
-  verification, payload validation, and server-side filtering.
-- **Justification**: Documented concrete exception under repository rules in AGENTS.md. Incoming webhook endpoints, header-based bearer verification, payload validation, and server-side filtering cannot be implemented as declarative REST actions and require programmatic execution in the n8n webhook lifecycle.
-
-### Runtime Evidence and Compatibility Notes
-
-- Tested and verified against EmDash CMS v1 (`emdash@1.0.1+`) and `@emdash-cms/plugin-webhook-notifier@0.2.2`.
-- Export class names `Emdash` and `EmdashTrigger` match the n8n loader convention derived from the registered `Emdash.node.js` and `EmdashTrigger.node.js` filenames. No additional alias constructors are exported.
-- Trigger outputs an unnested item payload directly into the workflow execution data pipeline: `{ workflowData: [this.helpers.returnJsonArray([body])] }`.
-- Content event collection filtering performs case-sensitive matching with whitespace trimming; media upload events bypass collection filtering.
+- The package exposes 103 ordinary REST actions across 11 resources. All remain declarative through routing, expressions, pagination, `preSend`, and `postReceive` hooks.
+- The sole node is `Emdash`, registered as `emdash`, and references the sole package credential `emdashApi`.
+- Runtime API evidence applies to the documented EmDash CMS v1 action routes; it does not establish support for the removed event plugin.
 
 ## Deferred Operations
 

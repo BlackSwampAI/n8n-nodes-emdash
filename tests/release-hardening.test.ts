@@ -13,9 +13,7 @@ import {
 } from '../scripts/scan-policy.mjs';
 import { assertRegisteredCredentialsAreWired } from '../scripts/node-load-smoke.mjs';
 import { Emdash } from '../nodes/EmDash/Emdash.node';
-import { EmdashTrigger } from '../nodes/EmDash/EmdashTrigger.node';
 import { EmDashApi } from '../credentials/EmDashApi.credentials';
-import { EmDashWebhook } from '../credentials/EmDashWebhook.credentials';
 
 const temporaryDirectories: string[] = [];
 afterEach(() => {
@@ -109,16 +107,13 @@ describe('compiled credential wiring invariant', () => {
 		).not.toThrow();
 	});
 
-	it('verifies EmDash node and EmdashTrigger wire their credentials', () => {
+	it('wires the sole API credential to the sole EmDash action node', () => {
 		const emdashNode = new Emdash();
-		const emdashTrigger = new EmdashTrigger();
 		const emdashCredential = new EmDashApi();
-		const emdashWebhook = new EmDashWebhook();
 		expect(() =>
-			assertRegisteredCredentialsAreWired(
-				[emdashNode, emdashTrigger],
-				[emdashCredential, emdashWebhook],
-			),
+			assertRegisteredCredentialsAreWired([emdashNode], [emdashCredential]),
 		).not.toThrow();
+		expect(emdashNode.description.name).toBe('emdash');
+		expect(emdashNode.description.credentials).toEqual([{ name: 'emdashApi', required: true }]);
 	});
 });

@@ -1,5 +1,7 @@
 # EmDash Integration Manual Release Test Plan
 
+> **Historical:** This document describes package versions that included the now-removed EmDash webhook trigger. It is retained as an audit record only. Version 0.1.4 supports 103 EmDash REST actions; migrate existing trigger workflows to Schedule Trigger + EmDash actions or another independently supported event source.
+
 This test plan provides a comprehensive quality-assurance checklist for testing **all 103 action operations** and the **EmDash Trigger** node against the local test lab before authorizing npm publication of `@blackswampai/n8n-nodes-emdash@0.1.0`.
 
 > [!IMPORTANT]

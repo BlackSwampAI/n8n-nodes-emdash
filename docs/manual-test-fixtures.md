@@ -1,5 +1,7 @@
 # EmDash Manual Test Lab Fixtures Inventory
 
+> **Historical:** This document describes package versions that included the now-removed EmDash webhook trigger. It is retained as an audit record only. Version 0.1.4 supports 103 EmDash REST actions; migrate existing trigger workflows to Schedule Trigger + EmDash actions or another independently supported event source.
+
 This document details all pre-seeded entities, credentials, and test assets created in the persistent local manual test lab located at `/home/chris/Projects/emdash-n8n-manual-lab`.
 
 > [!NOTE]
