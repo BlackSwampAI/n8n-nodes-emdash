@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4
+
+### Changed
+
+- Removed the EmDash webhook trigger and its dedicated webhook credential because the upstream notifier plugin is broken and event delivery cannot be verified. The package now registers one action node and its EmDash API credential, preserving all 103 REST actions and dependency versions.
+- Documented migration for existing trigger workflows: use Schedule Trigger with EmDash actions or another independently supported event source.
+
 ## 0.1.3
 
 ### Changed

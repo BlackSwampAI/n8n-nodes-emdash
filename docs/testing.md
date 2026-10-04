@@ -1,5 +1,17 @@
 # Testing strategy for EmDash integration
 
+## Current action-only contract
+
+Version 0.1.4 registers one visible EmDash action node and one credential, EmDash API. Regression tests require 103 action choices across 11 resources, action-only metadata, and the sole API credential wired to the node. There are no EmDash event or trigger choices. The removed webhook trigger depended on an EmDash notifier plugin whose delivery is broken and cannot be tested. After upgrading, workflows containing `emdashTrigger` have a missing node and must be migrated before they can run. Replace it with Schedule Trigger + EmDash actions or another independently supported event source.
+
+The action node remains declarative through REST routing, expressions, pagination, `preSend`, and `postReceive`. Unit and contract coverage exercises action metadata, visible controls, validation, routing, response normalization, upload serialization, pagination, and credential wiring. A representative real-n8n packed runtime smoke remains a release gate.
+
+## Historical trigger-era evidence
+
+The picker and runtime notes below describe earlier packages. The removed `tests/fixtures/n8n-picker-2.30.6.ts` fixture was used before 0.1.4 and is not part of the current test contract.
+
+The following records describe earlier package versions that included `emdashTrigger`. They are retained for audit history and are not instructions or support claims for version 0.1.4.
+
 ## Paired action/trigger picker convention
 
 n8n 2.30.6 bundles `n8n-editor-ui` 2.30.4. Its action generator removes `Trigger` from a trigger's
@@ -156,10 +168,7 @@ untouched.
 At candidate handoff, the task's manual lab and disposable test services were stopped and ports 4321,
 5680, and 5681 were verified closed. The user's primary n8n service and ports were preserved.
 
-The full EmDash Webhook Notifier-to-n8n path remains untested locally. EmDash core outbound SSRF
-protection blocks the loopback destination despite the notifier development flag. Test this on the
-public droplet by attaching the EmDash Webhook credential to the active workflow, copying n8n's
-generated HTTPS production URL into the notifier, and configuring the same shared token in both.
+The full EmDash Webhook Notifier-to-n8n path was never verified. This historical note is superseded by the 0.1.4 removal; it is not an instruction for current packages.
 
 Browser automation was unavailable. Visual node-picker differentiation, rendered icons, and dynamic
 dropdown behavior remain pending human checks; server metadata and icon HTTP responses do not satisfy

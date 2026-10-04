@@ -4,7 +4,7 @@ Consume and manage content, media, menus, schemas, taxonomies, search, URL redir
 
 > This is an independent Black Swamp AI community integration. It is not affiliated with, endorsed by, sponsored by, or maintained by EmDash or Cloudflare Inc. Product names and marks belong to their respective owners and are used only to identify compatibility.
 
-[Installation](#installation) · [Compatibility](#compatibility) · [Credentials](#credentials) · [Operations](#operations) · [Trigger](#trigger) · [Usage](#usage) · [Troubleshooting](#troubleshooting) · [Resources](#resources) · [Black Swamp AI](https://blackswampai.com/n8n-nodes/emdash/)
+[Installation](#installation) · [Compatibility](#compatibility) · [Credentials](#credentials) · [Operations](#operations) · [Migration](#existing-trigger-workflows) · [Usage](#usage) · [Troubleshooting](#troubleshooting) · [Resources](#resources) · [Black Swamp AI](https://blackswampai.com/n8n-nodes/emdash/)
 
 ## Installation
 
@@ -72,13 +72,6 @@ Effective authorization requires both the PAT scope and the user's underlying RB
 - **Widget Area operations**:
   - **PAT scopes**: Read queries (`GET`) require `content:read`. Write and mutation operations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `widgets:*` PAT scopes.
   - **RBAC permissions**: The authenticated user must separately possess the `widgets:read` capability for reads, and `widgets:manage` capability (Editor or Administrator role) for mutations.
-
-### EmDash Webhook Credential
-
-For incoming event webhooks handled by the **EmDash Trigger** node:
-
-1. In n8n, create an **EmDash Webhook** credential.
-2. **Secret Token**: Enter a shared secret token configured in your EmDash instance's Webhook Notifier settings.
 
 ## Operations
 
@@ -225,99 +218,9 @@ The EmDash community node provides 103 operations across 11 core resources:
 - **Delete Widget** (`deleteWidget`): Remove a widget from a widget area (does not delete referenced content, menus, or components).
 - **Reorder Widgets** (`reorderWidgets`): Update display ordering of widgets in an area using an ordered array of widget IDs.
 
-## Trigger
+## Existing trigger workflows
 
-The **EmDash Trigger** node (`emdashTrigger`) starts workflows automatically when content or media events occur in your EmDash CMS site.
-
-n8n groups the **EmDash** action and trigger choices under one EmDash service entry, following the
-same paired-node naming convention as its built-in Airtable integration. Action choices create an
-**EmDash** node; event choices create an **EmDash Trigger** node. Their workflow type identifiers
-remain `emdash` and `emdashTrigger`.
-
-The shared service description is **Work with EmDash content, media, and events**, so the grouped card
-describes both action and trigger choices.
-
-### Supported Events
-
-The trigger supports the 4 official events emitted by the EmDash Webhook Notifier plugin:
-
-- **Content Created** (`content:create`): Fired when a draft content entry is created.
-- **Content Updated** (`content:update`): Fired when an existing content entry is modified or saved.
-- **Content Deleted** (`content:delete`): Fired when an entry is moved to Trash or permanently deleted; the current notifier does not distinguish between the two.
-- **Media Uploaded** (`media:upload`): Fired when a media file is uploaded to the media library.
-
-### Event Payload Structure
-
-Webhooks deliver a JSON object envelope containing the following fields:
-
-- `event` (string, required): One of `content:create`, `content:update`, `content:delete`, `media:upload`.
-- `timestamp` (string, required): ISO 8601 UTC timestamp of event dispatch.
-- `resourceId` (string, required): Unique identifier of the created, mutated, or deleted resource.
-- `resourceType` (string, required): Resource category (`content` for content events, `media` for media events).
-- `collection` (string, required for content events): Target collection slug (e.g. `posts`, `pages`).
-- `data` (object, optional): Resource data payload. Inclusion is controlled by the EmDash notifier plugin setting `Include Content Data`. When enabled for content events, `data` contains the collection's custom content fields (`event.content.data`); system fields like `slug`, `status`, and `draftRevisionId` reside in `metadata`. When enabled for media upload events, `data` contains media metadata (`filename`, `mimeType`, `size`). When disabled, this field is omitted.
-- `metadata` (object, optional): System metadata about the event. For content events, contains `{ slug, status, draftRevisionId }`.
-
-Example content payload:
-
-```json
-{
-	"event": "content:create",
-	"timestamp": "2026-09-28T20:00:00.000Z",
-	"resourceId": "post_clx00123abc",
-	"resourceType": "content",
-	"collection": "posts",
-	"data": {
-		"title": "Announcing Product Launch",
-		"summary": "We are excited to share our latest release."
-	},
-	"metadata": {
-		"slug": "announcing-product-launch",
-		"status": "draft",
-		"draftRevisionId": "rev_01jk45mno"
-	}
-}
-```
-
-Example media payload:
-
-```json
-{
-	"event": "media:upload",
-	"timestamp": "2026-09-28T20:01:00.000Z",
-	"resourceId": "med_clx00456def",
-	"resourceType": "media",
-	"data": {
-		"filename": "hero-banner.jpg",
-		"mimeType": "image/jpeg",
-		"size": 245120
-	}
-}
-```
-
-### Setup Guide
-
-1. **Install Webhook Notifier plugin**: In your EmDash CMS installation, install and enable `@emdash-cms/plugin-webhook-notifier` (version 0.2.2 or higher).
-2. **Create EmDash Webhook credential**: In n8n, create an **EmDash Webhook** credential and configure a strong **Secret Token**.
-3. **Copy Webhook URL**: In n8n, open your EmDash Trigger node and copy the generated Webhook URL.
-4. **Configure EmDash settings**: In your EmDash administrative panel under Webhook Notifier settings:
-   - Paste the n8n Webhook URL into the **Webhook URL** field.
-   - Paste the Secret Token into the **Secret Token** field. The notifier sends this in the `Authorization: Bearer <secretToken>` header with every dispatch.
-   - Configure whether to include entry data payloads (`Include Content Data`).
-5. **Configure filters in n8n**:
-   - **Events**: Select **All Events** (`*`) or choose specific events (`content:create`, `content:update`, `content:delete`, `media:upload`).
-   - **Collection Filter**: Optionally enter a comma-separated list of collection slugs (e.g. `posts, pages`) to restrict workflow execution to specific content types. Media upload events are not filtered by collection.
-
-### Single-Webhook Limitation
-
-The EmDash Webhook Notifier plugin currently stores a single destination webhook URL per site installation. If multiple distinct workflows or downstream systems need to react to different CMS events, point EmDash to one primary n8n trigger workflow and use n8n branching or routing nodes (such as the **Switch** node or **Router**) to dispatch to sub-workflows.
-
-### Test URL vs Production URL
-
-When building and testing workflows in the n8n canvas:
-
-- Use the **Test URL** during workflow construction. EmDash webhooks will be routed to your open canvas execution session.
-- When activating the workflow for continuous operation, copy the **Production URL** and update the Webhook Notifier settings in your EmDash instance. Workflows will only trigger in the background when active and configured with the Production URL.
+Version 0.1.4 removes the EmDash webhook trigger because the EmDash webhook notifier plugin is currently broken and its event delivery cannot be verified. After upgrading, existing workflows that contain `emdashTrigger` will have a missing node and must be migrated before they can run. Replace it with **Schedule Trigger** and EmDash actions to poll for changes, or use another independently supported event source.
 
 ## Usage
 
@@ -398,7 +301,7 @@ Comment records returned by moderation endpoints contain commenter personal info
 
 ### Automated comment moderation workflows
 
-The `@emdash-cms/plugin-webhook-notifier` plugin does not currently emit webhook events for comment submission or status transitions. To automate comment moderation workflows (such as AI content analysis, automated spam detection, or alerts), configure an n8n workflow using the **Schedule Trigger** node to periodically poll **Comment → Get Many** filtered by `status: pending`.
+To automate comment moderation workflows (such as AI content analysis, automated spam detection, or alerts), configure an n8n workflow using the **Schedule Trigger** node to periodically poll **Comment → Get Many** filtered by `status: pending`.
 
 ### Menu management and hierarchy semantics
 
@@ -416,13 +319,13 @@ The Menu resource enables full lifecycle management of EmDash navigation structu
 - **Custom URL safety**: Navigation items configured with `type: custom` validate URLs through EmDash's upstream `safeHref` sanitizer. Permitted URL schemes include `http`, `https`, `mailto`, `tel`, relative web paths (`/about`), and fragment identifiers (`#contact`). Potentially unsafe protocols (such as `javascript:` or `data:`) are rejected.
 - **Referenced content semantics**: Navigation items linking to CMS entries (`page`, `post`, `taxonomy`, or `collection`) require `referenceCollection` (the target collection slug) and `referenceId`. In EmDash, `referenceId` corresponds to the translation-group identifier of the referenced content rather than an individual revision ID, allowing navigation links to resolve to the appropriate language variant automatically.
 - **Hierarchy and ordering**: The `reorderItems` operation accepts a JSON or native expression list of `{ id, parentId, sortOrder }` objects. Setting `parentId` to a sibling item ID creates nested sub-menus, while `null` positions items at the root level. `sortOrder` defines a zero-based integer display sequence among siblings. When updating single items via `updateItem`, passing an empty string or literal `"null"` moves an item back to the root level, whereas omitting `parentId` preserves existing hierarchy.
-- **Menu webhooks**: The `@emdash-cms/plugin-webhook-notifier` plugin does not emit webhook events for menu updates or reordering. Workflows responding to navigation changes should be scheduled periodically or sequenced downstream of content publishing flows.
+- **Menu webhooks**: Workflows responding to navigation changes should be scheduled periodically or sequenced downstream of content publishing flows.
 
 ### Example: Automated campaign navigation update
 
 A common content automation scenario involves publishing a promotional landing page and immediately integrating it into the site navigation menu:
 
-1. **Trigger on Publish**: An **EmDash Trigger** or **Schedule Trigger** detects a newly published landing page in the `pages` collection (e.g. `translationGroupId: "grp_summer_sale"`).
+1. **Trigger on Publish**: A **Schedule Trigger** with EmDash actions detects a newly published landing page in the `pages` collection (e.g. `translationGroupId: "grp_summer_sale"`).
 2. **Add Navigation Item**: An **EmDash** node executes **Menu → Create Item**:
    - **Menu**: `main-navigation`
    - **Type**: `Page`
@@ -456,7 +359,7 @@ The Section resource provides full lifecycle management of reusable template and
 - **Authentication and Permissions**:
   - **PAT Scopes**: Section reads (`GET`) require `content:read`. Section mutations (`POST`, `PUT`, `DELETE`) require `content:write` (or `admin`). EmDash does not define separate `sections:*` PAT scopes.
   - **RBAC Capabilities**: The authenticated user must separately possess the `sections:read` role capability for reads, and `sections:manage` capability (Editor or Administrator) for mutations.
-- **Webhooks**: The `@emdash-cms/plugin-webhook-notifier` plugin does not emit webhook events for section modifications. Workflows managing sections should be scheduled or triggered downstream of content workflows.
+- **Webhooks**: Workflows managing sections should be scheduled or triggered downstream of content workflows.
 
 ### Widget Area and Widget Configuration
 

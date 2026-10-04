@@ -26,14 +26,8 @@ describe('raw template safety and tooling', () => {
 			typescript: '5.9.3',
 			vitest: '4.1.11',
 		});
-		expect(packageJson.n8n.nodes).toEqual([
-			'dist/nodes/EmDash/Emdash.node.js',
-			'dist/nodes/EmDash/EmdashTrigger.node.js',
-		]);
-		expect(packageJson.n8n.credentials).toEqual([
-			'dist/credentials/EmDashApi.credentials.js',
-			'dist/credentials/EmDashWebhook.credentials.js',
-		]);
+		expect(packageJson.n8n.nodes).toEqual(['dist/nodes/EmDash/Emdash.node.js']);
+		expect(packageJson.n8n.credentials).toEqual(['dist/credentials/EmDashApi.credentials.js']);
 	});
 
 	it('uses declarative routing for the default REST example', async () => {
